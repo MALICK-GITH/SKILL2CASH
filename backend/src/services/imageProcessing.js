@@ -58,9 +58,9 @@ export function extractAmountCandidates(text) {
   const seen = new Set();
   const source = foldText(text);
   const patterns = [
-    /\b(?:amount|montant|deposit|depot|credit|sent|envoye)\s*[:\-]?\s*([0-9][0-9\s.,]{2,})\b/g,
-    /\b([0-9][0-9\s.,]{2,})\s*(?:cfa|xfc|frs?)\b/g,
-    /\b([0-9][0-9\s.,]{3,})\b/g
+    /\b(?:amount|montant|deposit|depot|credit|sent|envoye|paiement|payment|recu|received)\s*[:\-]?\s*([0-9][0-9\s.,]{2,})\b/g,
+    /\b([0-9][0-9\s.,]{2,})\s*(?:cfa|xfc|frs?|xaf|fr)\b/g,
+    /\b(?:cfa|xfc|frs?|xaf|fr)\s*([0-9][0-9\s.,]{2,})\b/g
   ];
 
   for (const pattern of patterns) {

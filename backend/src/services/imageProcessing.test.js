@@ -8,8 +8,8 @@ test('normalizeDigits strips separators from amounts', () => {
 });
 
 test('extractAmountCandidates finds visible payment amounts', () => {
-  const amounts = extractAmountCandidates('Paiement reçu 5 000 CFA référence 128944');
-  assert.deepEqual(amounts, ['5000', '128944']);
+  const amounts = extractAmountCandidates('Paiement recu 5 000 CFA reference 128944');
+  assert.deepEqual(amounts, ['5000']);
 });
 
 test('normalizeScore still parses classic scoreboard formats', () => {

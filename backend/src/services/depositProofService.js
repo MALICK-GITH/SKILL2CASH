@@ -13,19 +13,41 @@ function extractReferenceCandidates(text) {
   const source = normalizeText(text);
   const candidates = [];
   const seen = new Set();
-  for (const match of source.matchAll(/\b([a-z0-9]{6,})\b/g)) {
-    const value = match[1];
-    if (value.length < 6 || seen.has(value)) continue;
-    seen.add(value);
-    candidates.push(value);
+  const patterns = [
+    /\b(?:ref|reference|transaction|transaction reference|id|numero|number)\s*[:\-]?\s*([a-z0-9]{4,})\b/g,
+    /\b([a-z0-9]{8,})\b/g
+  ];
+
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    for (const match of source.matchAll(pattern)) {
+      const value = match[1];
+      if (value.length < 4 || seen.has(value)) continue;
+      seen.add(value);
+      candidates.push(value);
+    }
   }
   return candidates;
 }
 
+function detectExactAmount(text, amount) {
+  const normalizedAmount = normalizeDigits(amount);
+  if (!normalizedAmount) return '';
+
+  const candidates = extractAmountCandidates(text);
+  const direct = candidates.find((candidate) => candidate === normalizedAmount);
+  if (direct) return direct;
+
+  const compact = normalizeText(text).replace(/\s+/g, '');
+  if (compact.includes(normalizedAmount)) return normalizedAmount;
+
+  return '';
+}
+
 function pickBestDepositMatch(results) {
   return results.reduce((best, current) => {
-    const currentScore = (current.confidence || 0) + (current.amountMatched ? 20 : 0) + (current.senderMatched ? 10 : 0) + (current.referenceMatched ? 5 : 0);
-    const bestScore = (best.confidence || 0) + (best.amountMatched ? 20 : 0) + (best.senderMatched ? 10 : 0) + (best.referenceMatched ? 5 : 0);
+    const currentScore = (current.confidence || 0) + (current.amountMatched ? 25 : 0) + (current.senderMatched ? 10 : 0) + (current.referenceMatched ? 5 : 0);
+    const bestScore = (best.confidence || 0) + (best.amountMatched ? 25 : 0) + (best.senderMatched ? 10 : 0) + (best.referenceMatched ? 5 : 0);
     return currentScore > bestScore ? current : best;
   });
 }
@@ -66,8 +88,7 @@ export async function analyzeDepositProof(screenshot, { senderName, amount, meth
       const text = recognized.data?.text || '';
       const confidence = Math.round(recognized.data?.confidence || 0);
       const amountCandidates = extractAmountCandidates(text);
-      const normalizedAmount = normalizeDigits(amount);
-      const amountMatched = amountCandidates.includes(normalizedAmount);
+      const amountMatched = Boolean(detectExactAmount(text, amount));
       const senderMatched = detectNamesFromText(text, [senderName]).length > 0;
       const referenceCandidates = extractReferenceCandidates(text);
       const referenceMatched = Boolean(transactionReference)
@@ -87,8 +108,7 @@ export async function analyzeDepositProof(screenshot, { senderName, amount, meth
 
     const best = pickBestDepositMatch(results);
     const detectedSender = best.senderMatched ? senderName : '';
-    const normalizedAmount = normalizeDigits(amount);
-    const matchingAmount = best.amountCandidates.find((candidate) => candidate === normalizedAmount) || '';
+    const matchingAmount = detectExactAmount(best.text, amount);
     const detectedReference = transactionReference
       ? best.referenceCandidates.find((candidate) => normalizeText(candidate).includes(normalizeText(transactionReference)) || normalizeText(transactionReference).includes(normalizeText(candidate))) || ''
       : best.referenceCandidates[0] || '';
