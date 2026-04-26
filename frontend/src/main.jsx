@@ -905,7 +905,7 @@ function WalletView({ refreshTick, onRefresh }) {
         <h2 id="deposits-title">Historique des dépôts</h2>
         <DataList rows={state?.deposits} empty="Aucun dépôt" render={(d) => (
           <div className="row">
-            <span>{d.method.toUpperCase()} · {d.senderName}<small className="text-gray-300">{d.status} · {timeAgo(d.createdAt)} {d.adminNote ? `· ${d.adminNote}` : ''}</small></span>
+            <span>{d.method.toUpperCase()} · {d.senderName}<small className="text-gray-300">{d.status} · OCR {d.autoVerificationStatus || 'pending'} · {timeAgo(d.createdAt)} {d.adminNote ? `· ${d.adminNote}` : ''}</small></span>
             <strong className="text-white">{money(d.amount)}</strong>
             <b className={`status-pill status-pill--${d.status === 'approved' ? 'success' : d.status === 'rejected' ? 'danger' : 'warning'}`}>{d.status}</b>
           </div>
@@ -1830,7 +1830,7 @@ function Admin() {
         <DataList rows={deposits} empty="Aucun dépôt" render={(d) => (
           <div className="deposit-row">
             <div className="row">
-              <span>{d.user?.username} · {d.method.toUpperCase()}<small className="text-gray-300">{d.senderName} · {d.senderPhone} · {d.transactionReference || 'sans référence'}</small></span>
+              <span>{d.user?.username} · {d.method.toUpperCase()}<small className="text-gray-300">{d.senderName} · {d.senderPhone} · {d.transactionReference || 'sans référence'} · OCR {d.autoVerificationStatus || 'pending'} · {d.autoVerificationReason || 'en attente'}{d.ocrDetectedAmount ? ` · montant lu ${d.ocrDetectedAmount}` : ''}{d.ocrDetectedSender ? ` · expéditeur lu ${d.ocrDetectedSender}` : ''}</small></span>
               <strong className="text-white">{money(d.amount)}</strong>
               <b className={d.status === 'approved' ? 'text-cyber-accent' : d.status === 'rejected' ? 'text-cyber-danger' : 'text-cyber-warning'}>{d.status}</b>
               {d.status === 'pending' && <button onClick={() => approveDeposit(d._id)} className="cyber-button" aria-label={`Approuver le dépôt de ${money(d.amount)} de ${d.user?.username}`}>Approuver</button>}

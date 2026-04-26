@@ -1,77 +1,13 @@
+import {
+  buildOcrVariants,
+  decodeImageDataUrl,
+  detectNamesFromText,
+  extractAmountCandidates,
+  extractScoreCandidates,
+  normalizeScore
+} from './imageProcessing.js';
+
 const OCR_MIN_CONFIDENCE = 85;
-
-function foldText(value) {
-  return String(value || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-}
-
-function normalizeText(value) {
-  return foldText(value)
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
-
-function compactText(value) {
-  return normalizeText(value).replace(/\s+/g, '');
-}
-
-export function normalizeScore(value) {
-  const match = String(value || '').match(/\b(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/);
-  return match ? `${Number(match[1])}-${Number(match[2])}` : '';
-}
-
-export function extractScoreCandidates(text) {
-  const candidates = [];
-  const seen = new Set();
-  const variants = [foldText(text), normalizeText(text)];
-  const patterns = [
-    /\b(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/g,
-    /\bscore\s*(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/g,
-    /\bresult(?:at)?\s*(?:final)?\s*(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/g,
-    /\b(?:ft|full time|final)\s*(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/g
-  ];
-
-  for (const variant of variants) {
-    for (const pattern of patterns) {
-      pattern.lastIndex = 0;
-      for (const match of variant.matchAll(pattern)) {
-        const score = `${Number(match[1])}-${Number(match[2])}`;
-        if (!seen.has(score)) {
-          seen.add(score);
-          candidates.push(score);
-        }
-      }
-    }
-  }
-
-  return candidates;
-}
-
-function detectScore(text) {
-  return extractScoreCandidates(text)[0] || '';
-}
-
-export function detectPlayersFromText(text, players = []) {
-  const normalizedText = normalizeText(text);
-  const compact = compactText(text);
-
-  return players
-    .filter((player) => {
-      const username = String(player?.username || '');
-      const normalizedUsername = normalizeText(username);
-      if (normalizedUsername.length < 3) return false;
-
-      const compactUsername = compactText(username);
-      if (compact.includes(compactUsername)) return true;
-      if (normalizedText.includes(normalizedUsername)) return true;
-
-      const usernameTokens = normalizedUsername.split(/\s+/).filter((token) => token.length >= 3);
-      return usernameTokens.length > 0 && usernameTokens.every((token) => normalizedText.includes(token));
-    })
-    .map((player) => player.username);
-}
 
 function probableWinnerFromScore(score, players) {
   const normalized = normalizeScore(score);
@@ -84,37 +20,40 @@ function probableWinnerFromScore(score, players) {
   return player1Score > player2Score ? players[0]._id : players[1]._id;
 }
 
-function getValidImageBuffer(screenshot) {
-  const match = String(screenshot || '').match(/^data:image\/(png|jpe?g|webp);base64,([a-z0-9+/=\s]+)$/i);
-  if (!match) return null;
-
-  const buffer = Buffer.from(match[2].replace(/\s/g, ''), 'base64');
-  if (buffer.length < 10 * 1024) return null;
-
-  const isPng = buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
-  const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-  const isWebp = buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP';
-  return isPng || isJpeg || isWebp ? buffer : null;
-}
-
-async function recognizePass(worker, imageBuffer, parameters = {}) {
+async function recognizeVariant(worker, imageBuffer, parameters = {}) {
   if (worker.setParameters) {
     await worker.setParameters(parameters).catch(() => {});
   }
 
   const result = await worker.recognize(imageBuffer);
+  const text = result.data?.text || '';
+  const confidence = Math.round(result.data?.confidence || 0);
   return {
-    text: result.data?.text || '',
-    confidence: Math.round(result.data?.confidence || 0)
+    text,
+    confidence,
+    scoreCandidates: extractScoreCandidates(text),
+    amountCandidates: extractAmountCandidates(text),
+    playersDetected: []
   };
 }
 
+function rankVariant(result) {
+  const scoreBonus = result.scoreCandidates.length > 0 ? 20 : 0;
+  const amountBonus = result.amountCandidates.length > 0 ? 10 : 0;
+  return result.confidence + scoreBonus + amountBonus;
+}
+
+function pickBestVariant(results) {
+  return results.reduce((best, current) => (rankVariant(current) > rankVariant(best) ? current : best));
+}
+
 export async function analyzeMatchScreenshot(screenshot, players) {
-  const imageBuffer = getValidImageBuffer(screenshot);
+  const imageBuffer = decodeImageDataUrl(screenshot, { minBytes: 10 * 1024 });
   if (!imageBuffer) {
     return {
       text: '',
       score: '',
+      scoreCandidates: [],
       playersDetected: [],
       confidence: 0,
       probableWinner: null,
@@ -128,33 +67,40 @@ export async function analyzeMatchScreenshot(screenshot, players) {
     const { createWorker } = await import('tesseract.js');
     worker = await createWorker('eng');
 
-    const generalPass = await recognizePass(worker, imageBuffer, {
-      preserve_interword_spaces: '1',
-      tessedit_pageseg_mode: '6'
-    });
-    const digitsPass = await recognizePass(worker, imageBuffer, {
+    const variants = await buildOcrVariants(imageBuffer, 'duel');
+    const generalResults = [];
+    for (const variant of variants) {
+      generalResults.push(await recognizeVariant(worker, variant.buffer, {
+        preserve_interword_spaces: '1',
+        tessedit_pageseg_mode: '6'
+      }));
+    }
+
+    const bestGeneral = pickBestVariant(generalResults);
+    const bestVariant = variants[generalResults.indexOf(bestGeneral)] || variants[0];
+    const digitsResult = await recognizeVariant(worker, bestVariant.buffer, {
       preserve_interword_spaces: '1',
       tessedit_pageseg_mode: '6',
       tessedit_char_whitelist: '0123456789-:/scoreresultfinalft '
     });
 
-    const combinedText = [generalPass.text, digitsPass.text].filter(Boolean).join('\n').trim();
-    const scoreCandidates = extractScoreCandidates([digitsPass.text, generalPass.text].join('\n'));
-    const score = scoreCandidates[0] || detectScore(combinedText);
-    const playersDetected = detectPlayersFromText(combinedText, players);
-    const confidence = Math.max(generalPass.confidence, digitsPass.confidence);
+    const combinedText = [bestGeneral.text, digitsResult.text].filter(Boolean).join('\n').trim();
+    const combinedScoreCandidates = Array.from(new Set([
+      ...(bestGeneral.scoreCandidates || []),
+      ...(digitsResult.scoreCandidates || [])
+    ]));
+    const score = combinedScoreCandidates[0] || extractScoreCandidates(combinedText)[0] || '';
+    const playersDetected = detectNamesFromText(combinedText, players.map((player) => player.username));
+    const confidence = Math.max(bestGeneral.confidence, digitsResult.confidence);
+    const probableWinner = probableWinnerFromScore(score, players);
 
     return {
       text: combinedText,
       score,
-      scoreCandidates,
+      scoreCandidates: combinedScoreCandidates,
       playersDetected,
       confidence,
-      passes: {
-        general: generalPass,
-        digits: digitsPass
-      },
-      probableWinner: probableWinnerFromScore(score, players),
+      probableWinner,
       status: confidence >= OCR_MIN_CONFIDENCE && Boolean(score) ? 'ok' : 'low_confidence'
     };
   } catch (error) {
@@ -199,4 +145,8 @@ export function shouldAutoApproveWithOcr({ duel, player1, player2 }) {
   return { approved: true, reason: 'Declared results and OCR match with high confidence' };
 }
 
-export { OCR_MIN_CONFIDENCE };
+export function detectPlayersFromText(text, players = []) {
+  return detectNamesFromText(text, players.map((player) => player.username));
+}
+
+export { OCR_MIN_CONFIDENCE, extractScoreCandidates, normalizeScore };

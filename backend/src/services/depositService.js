@@ -5,6 +5,7 @@ import { Transaction } from '../models/Transaction.js';
 import { User } from '../models/User.js';
 import { AppError } from '../utils/AppError.js';
 import { notifyUser } from './notificationService.js';
+import { analyzeDepositProof } from './depositProofService.js';
 import { ensureWallet } from './walletService.js';
 
 const MAX_PENDING_DEPOSITS = 3;
@@ -56,6 +57,13 @@ export async function createManualDeposit(userId, payload) {
     throw new AppError('Révision de dépôt bloquée après rejets répétés. Contactez le support.', 403);
   }
 
+  const proofAnalysis = await analyzeDepositProof(screenshotUrl, {
+    senderName,
+    amount,
+    method,
+    transactionReference
+  });
+
   return Deposit.create({
     user: userId,
     method,
@@ -64,7 +72,15 @@ export async function createManualDeposit(userId, payload) {
     senderPhone,
     transactionReference,
     screenshotUrl,
-    status: 'pending'
+    status: 'pending',
+    autoVerificationStatus: proofAnalysis.status,
+    autoVerificationReason: proofAnalysis.reason,
+    ocrText: proofAnalysis.text,
+    ocrConfidence: proofAnalysis.confidence,
+    ocrDetectedSender: proofAnalysis.detectedSender,
+    ocrDetectedAmount: proofAnalysis.detectedAmount,
+    ocrDetectedReference: proofAnalysis.detectedReference,
+    ocrAmountCandidates: proofAnalysis.amountCandidates
   });
 }
 
