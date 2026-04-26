@@ -27,6 +27,7 @@ userRouter.get('/search', asyncHandler(async (req, res) => {
   if (req.query.q) filter.username = { $regex: req.query.q, $options: 'i' };
   if (req.query.country) filter.country = req.query.country;
   if (req.query.level) filter.level = req.query.level;
+  if (req.query.status) filter.status = req.query.status;
   if (req.query.available === 'true') filter.status = 'available';
   if (req.query.online === 'true') filter.status = 'online';
   if (req.query.excludeId && mongoose.Types.ObjectId.isValid(req.query.excludeId)) {

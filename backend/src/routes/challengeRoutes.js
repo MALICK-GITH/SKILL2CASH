@@ -10,6 +10,31 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const challengeRouter = express.Router();
+
+challengeRouter.get('/public', asyncHandler(async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit || 12), 1), 24);
+  const challenges = await Challenge.find({ status: { $in: ['pending', 'counter_offer'] } })
+    .populate('challenger', 'username avatar country rank status reputation winRate minStake maxStake')
+    .populate('challenged', 'username avatar country rank status reputation winRate minStake maxStake')
+    .sort({ createdAt: -1 })
+    .limit(limit);
+
+  res.json({
+    challenges: challenges.map((challenge) => ({
+      id: challenge._id,
+      challenger: challenge.challenger,
+      challenged: challenge.challenged,
+      amount: challenge.amount,
+      matchType: challenge.matchType,
+      rules: challenge.rules,
+      status: challenge.status,
+      createdAt: challenge.createdAt,
+      expiresAt: challenge.expiresAt,
+      counterAmount: challenge.counterAmount
+    }))
+  });
+}));
+
 challengeRouter.use(protect);
 
 challengeRouter.post('/', requireFields(['challengedId', 'amount']), asyncHandler(async (req, res) => {

@@ -25,6 +25,8 @@ import { API_URL, api, clearSession, getStoredUser, getToken, setSession } from 
 import './styles.css';
 
 const money = (value) => `${Number(value || 0).toLocaleString('fr-FR')} CFA`;
+const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/EL4j85SBKiIL7UI9NfeSAB';
+const WHATSAPP_NOTICE_KEY = 'skill2cash_whatsapp_notice_hidden';
 
 function timeAgo(value) {
   const timestamp = new Date(value).getTime();
@@ -66,6 +68,29 @@ function transactionGroup(type = '') {
   return 'all';
 }
 
+function humanizeStatus(status = '') {
+  const labels = {
+    online: 'En ligne',
+    offline: 'Hors ligne',
+    busy: 'Occupé',
+    available: 'Disponible',
+    pending: 'En attente',
+    accepted: 'Accepté',
+    declined: 'Refusé',
+    cancelled: 'Annulé',
+    counter_offer: 'Contre-proposition',
+    active: 'Actif',
+    waiting_result: 'En attente de résultat',
+    under_review: 'En vérification',
+    dispute: 'Litige',
+    finished: 'Terminé',
+    approved: 'Validé',
+    rejected: 'Rejeté',
+    paid: 'Payé'
+  };
+  return labels[status] || status || 'Inconnu';
+}
+
 async function loadSections(requests) {
   const entries = Object.entries(requests);
   const settled = await Promise.allSettled(entries.map(([, request]) => request()));
@@ -88,11 +113,17 @@ function App() {
   const [user, setUser] = useState(getStoredUser());
   const [view, setView] = useState(user ? 'dashboard' : 'landing');
   const [notice, setNotice] = useState('');
+  const [communityNoticeHidden, setCommunityNoticeHidden] = useState(() => localStorage.getItem(WHATSAPP_NOTICE_KEY) === '1');
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedDuel, setSelectedDuel] = useState(null);
   const [liveFeed, setLiveFeed] = useState([]);
   const [refreshTick, setRefreshTick] = useState(0);
   const refreshData = () => setRefreshTick((current) => current + 1);
+
+  function dismissCommunityNotice() {
+    setCommunityNoticeHidden(true);
+    localStorage.setItem(WHATSAPP_NOTICE_KEY, '1');
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -169,6 +200,7 @@ function App() {
     ['wallet', Wallet, 'Portefeuille'],
     ['players', Search, 'Joueurs'],
     ['duels', Swords, 'Duels'],
+    ['activity', Bell, 'Activité'],
     ['leaderboard', Trophy, 'Classement'],
     ['history', History, 'Historique'],
     ...(user?.role === 'admin' ? [['admin', Shield, 'Admin']] : [])
@@ -185,6 +217,21 @@ function App() {
 
   return (
     <main className="min-h-screen bg-cyber-black text-white">
+      {!communityNoticeHidden && (
+        <div className="community-banner" role="region" aria-label="Groupe WhatsApp officiel">
+          <div className="community-banner-copy">
+            <strong>Groupe WhatsApp officiel</strong>
+            <span>Les d?fis publics se lancent ici, puis la salle est cr??e sur le site pour officialiser le pari.</span>
+          </div>
+          <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noopener noreferrer" className="cyber-button community-banner-action" aria-label="Rejoindre le groupe WhatsApp officiel">
+            <MessageSquare size={18} aria-hidden="true" />
+            Rejoindre le groupe
+          </a>
+          <button type="button" className="secondary community-banner-close" onClick={dismissCommunityNotice} aria-label="Masquer la notification WhatsApp officielle">
+            Masquer
+          </button>
+        </div>
+      )}
       {notice && <div className="toast bg-cyber-card border border-cyber-primary/50 px-4 py-3 rounded-lg cursor-pointer hover:bg-cyber-dark transition-colors" onClick={() => setNotice('')}><Bell size={16} />{notice}</div>}
       <aside className="sidebar bg-cyber-dark border-r border-cyber-primary/20">
         <button className="brand hover:text-cyber-primary transition-colors" onClick={() => setView(user ? 'dashboard' : 'landing')} aria-label="Retour à l'accueil">
@@ -206,7 +253,7 @@ function App() {
               <span>{user.username}<small className="text-cyber-accent">{user.rank || 'Bronze'} joueur</small></span>
             </div>
             <div className="mx-4 mb-3 flex gap-2">
-              <a href="https://wa.me/2250576459876" target="_blank" rel="noopener noreferrer" className="cyber-card flex-1 flex items-center justify-center gap-2 text-sm" aria-label="Rejoindre la communauté WhatsApp">
+              <a href="https://chat.whatsapp.com/EL4j85SBKiIL7UI9NfeSAB" target="_blank" rel="noopener noreferrer" className="cyber-card flex-1 flex items-center justify-center gap-2 text-sm" aria-label="Rejoindre le groupe WhatsApp officiel">
                 💬 WhatsApp
               </a>
               <a href="#" target="_blank" rel="noopener noreferrer" className="cyber-card flex-1 flex items-center justify-center gap-2 text-sm" aria-label="Rejoindre le serveur Discord">
@@ -230,9 +277,10 @@ function App() {
         {user && view === 'dashboard' && <Dashboard user={user} liveFeed={liveFeed} setView={setView} setSelectedDuel={setSelectedDuel} refreshTick={refreshTick} onRefresh={refreshData} />}
         {user && view === 'wallet' && <WalletView refreshTick={refreshTick} onRefresh={refreshData} />}
         {user && view === 'players' && <Players currentUser={user} setSelectedPlayer={setSelectedPlayer} setView={setView} />}
-        {user && view === 'profile' && <PlayerProfile player={selectedPlayer} setView={setView} />}
+        {user && view === 'profile' && <PlayerProfileDetails player={selectedPlayer} setView={setView} />}
         {user && view === 'duels' && <Duels setSelectedDuel={setSelectedDuel} setView={setView} refreshTick={refreshTick} onRefresh={refreshData} />}
         {user && view === 'duel-room' && <DuelRoom duelId={selectedDuel} user={user} setView={setView} onRefresh={refreshData} />}
+        {user && view === 'activity' && <Activity liveFeed={liveFeed} setView={setView} />}
         {user && view === 'leaderboard' && <Leaderboard />}
         {user && view === 'history' && <HistoryView refreshTick={refreshTick} />}
         {user && view === 'admin' && <Admin />}
@@ -242,6 +290,27 @@ function App() {
 }
 
 function Landing({ setView }) {
+  const [publicChallenges, setPublicChallenges] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    api('/challenges/public?limit=8')
+      .then((data) => {
+        if (active) setPublicChallenges(data.challenges || []);
+      })
+      .catch(() => {
+        if (active) setPublicChallenges([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="landing">
       <div className="hero">
@@ -251,9 +320,43 @@ function Landing({ setView }) {
         <p>Bienvenue sur SKILL2CASH, la plateforme où ton niveau eFootball devient ton argent. Défie des joueurs du monde entier, prouve ton skill, gagne tes duels et encaisse tes gains.</p>
         <div className="actions">
           <button onClick={() => setView('register')} aria-label="Créer un compte et commencer à jouer"><Gamepad2 size={18} aria-hidden="true" />Commencer à jouer</button>
-          <button className="secondary" onClick={() => setView('login')} aria-label="Se connecter à son compte">Connexion</button>
+          <button className="secondary" onClick={() => setView('login')} aria-label="Se connecter ? son compte">Connexion</button>
+          <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noopener noreferrer" className="secondary" aria-label="Rejoindre le groupe WhatsApp officiel">
+            <MessageSquare size={18} aria-hidden="true" />
+            Groupe WhatsApp
+          </a>
         </div>
       </div>
+      <section className="panel public-wall">
+        <div className="page-head">
+          <span>
+            <p className="eyebrow">Défis publics</p>
+            <h2>Mur d'activité</h2>
+          </span>
+          <button type="button" className="secondary" onClick={() => setView('register')} aria-label="Créer un compte pour rejoindre les défis">
+            Rejoindre
+          </button>
+        </div>
+        {loading ? (
+          <p className="muted">Chargement des défis publics...</p>
+        ) : (
+          <DataList
+            rows={publicChallenges}
+            empty="Aucun défi public pour le moment"
+            render={(challenge) => (
+              <div className="row">
+                <span>
+                  {challenge.challenger?.username} ↔ {challenge.challenged?.username || 'Ouvert'}
+                  <small className="text-gray-300">
+                    {challenge.matchType} · {money(challenge.amount)} · {humanizeStatus(challenge.status)}
+                  </small>
+                </span>
+                <strong className="text-white">{timeAgo(challenge.createdAt)}</strong>
+              </div>
+            )}
+          />
+        )}
+      </section>
       <div className="ticker" aria-hidden="true">
         {['PLAY HARD. WIN CASH.', 'ONLY SKILL PAYS.', 'YOU PLAY. YOU PROVE. YOU EARN.'].map((item) => <span key={item}>{item}</span>)}
       </div>
@@ -842,17 +945,24 @@ function Players({ currentUser, setSelectedPlayer, setView }) {
   const [players, setPlayers] = useState([]);
   const [q, setQ] = useState('');
   const [country, setCountry] = useState('');
-  const [onlineOnly, setOnlineOnly] = useState(true);
+  const [status, setStatus] = useState('online');
+  const [level, setLevel] = useState('');
+  const [minStake, setMinStake] = useState('');
+  const [maxStake, setMaxStake] = useState('');
+  const [minWinRate, setMinWinRate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   async function load(nextFilters = {}) {
-    const nextOnlineOnly = nextFilters.onlineOnly ?? onlineOnly;
     const params = new URLSearchParams({
       q: nextFilters.q ?? q,
-      online: String(nextOnlineOnly),
       excludeId: currentUser?._id || '',
-      ...(nextFilters.country ? { country: nextFilters.country } : country ? { country } : {})
+      ...(nextFilters.country ? { country: nextFilters.country } : country ? { country } : {}),
+      ...(nextFilters.status ? { status: nextFilters.status } : status && status !== 'all' ? { status } : {}),
+      ...(nextFilters.level ? { level: nextFilters.level } : level ? { level } : {}),
+      ...(nextFilters.minStake !== undefined && nextFilters.minStake !== '' ? { minStake: String(nextFilters.minStake) } : minStake !== '' ? { minStake } : {}),
+      ...(nextFilters.maxStake !== undefined && nextFilters.maxStake !== '' ? { maxStake: String(nextFilters.maxStake) } : maxStake !== '' ? { maxStake } : {}),
+      ...(nextFilters.minWinRate !== undefined && nextFilters.minWinRate !== '' ? { minWinRate: String(nextFilters.minWinRate) } : minWinRate !== '' ? { minWinRate } : {})
     });
     setLoading(true);
     setError('');
@@ -866,14 +976,18 @@ function Players({ currentUser, setSelectedPlayer, setView }) {
   }
 
   useEffect(() => {
-    load({ onlineOnly: true });
+    load({ status: 'online' });
   }, [currentUser]);
 
   function resetFilters() {
     setQ('');
     setCountry('');
-    setOnlineOnly(true);
-    load({ q: '', country: '', onlineOnly: true });
+    setStatus('online');
+    setLevel('');
+    setMinStake('');
+    setMaxStake('');
+    setMinWinRate('');
+    load({ q: '', country: '', status: 'online', level: '', minStake: '', maxStake: '', minWinRate: '' });
   }
 
   return (
@@ -888,22 +1002,26 @@ function Players({ currentUser, setSelectedPlayer, setView }) {
       <section className="filters">
         <input placeholder="Pseudo exact ou partiel" value={q} onChange={(e) => setQ(e.target.value)} />
         <input placeholder="Pays" value={country} onChange={(e) => setCountry(e.target.value)} />
-        <button type="button" className={onlineOnly ? 'active' : 'secondary'} onClick={() => {
-          const next = !onlineOnly;
-          setOnlineOnly(next);
-          load({ onlineOnly: next });
-        }}>
-          {onlineOnly ? 'En ligne' : 'Tous'}
-        </button>
-        <button type="button" onClick={load}><Search size={18} />Rechercher</button>
-        <button type="button" className="secondary" onClick={resetFilters}>R?initialiser</button>
+        <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="online">En ligne</option>
+          <option value="available">Disponible</option>
+          <option value="busy">Occupé</option>
+          <option value="offline">Hors ligne</option>
+          <option value="all">Tous</option>
+        </select>
+        <input placeholder="Niveau" value={level} onChange={(e) => setLevel(e.target.value)} />
+        <input placeholder="Mise min" type="number" value={minStake} onChange={(e) => setMinStake(e.target.value)} />
+        <input placeholder="Mise max" type="number" value={maxStake} onChange={(e) => setMaxStake(e.target.value)} />
+        <input placeholder="Taux de victoire min" type="number" value={minWinRate} onChange={(e) => setMinWinRate(e.target.value)} />
+        <button type="button" onClick={() => load()}><Search size={18} />Rechercher</button>
+        <button type="button" className="secondary" onClick={resetFilters}>Réinitialiser</button>
       </section>
       {error && <section className="panel"><p className="error">{error}</p></section>}
       {loading && <section className="panel"><p className="muted">Recherche des joueurs...</p></section>}
       {!loading && !error && (
         <section className="panel">
           <p className="muted">
-            {onlineOnly ? 'Joueurs actuellement connect?s' : 'Tous les joueurs actifs'} ? {players.length} profil{players.length > 1 ? 's' : ''} trouv?{players.length > 1 ? 's' : ''}
+            {status === 'all' ? 'Tous les joueurs' : `Joueurs ${humanizeStatus(status).toLowerCase()}`} · {players.length} profil{players.length > 1 ? 's' : ''} trouvé{players.length > 1 ? 's' : ''}
           </p>
         </section>
       )}
@@ -917,6 +1035,7 @@ function Players({ currentUser, setSelectedPlayer, setView }) {
 function PlayerCard({ player, onClick }) {
   const minStake = money(player.minStake);
   const maxStake = money(player.maxStake);
+  const trustScore = Math.round((Number(player.reputation || 0) + Number(player.winRate || 0)) / 2);
   return (
     <button className="player-card" type="button" onClick={onClick}>
       <img src={player.avatar || `https://api.dicebear.com/9.x/bottts/svg?seed=${player.username}`} alt="" />
@@ -926,7 +1045,8 @@ function PlayerCard({ player, onClick }) {
       </span>
       <b>{player.rank}</b>
       <small>{player.wins}V / {player.losses}D · {player.winRate}%</small>
-      <small>Fiabilité {player.reputation || 0}/100 · {player.status}</small>
+      <small>Fiabilité {player.reputation || 0}/100 · Confiance {trustScore}/100</small>
+      <small><b className={`status-pill status-pill--${player.status === 'online' || player.status === 'available' ? 'success' : player.status === 'busy' ? 'warning' : 'neutral'}`}>{humanizeStatus(player.status)}</b></small>
       <small>Mise {minStake} - {maxStake}</small>
     </button>
   );
@@ -970,6 +1090,96 @@ function PlayerProfile({ player, setView }) {
         <textarea placeholder="Message optionnel" value={message} onChange={(e) => setMessage(e.target.value)} />
         <button onClick={challenge} type="button"><Swords size={18} />Envoyer un défi</button>
         {status && <p className="muted">{status}</p>}
+      </section>
+      <button className="secondary" type="button" onClick={() => setView('players')}>Retour</button>
+    </div>
+  );
+}
+
+function PlayerProfileDetails({ player, setView }) {
+  const [profile, setProfile] = useState(player);
+  const [amount, setAmount] = useState(player?.minStake || 1000);
+  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(Boolean(player));
+
+  useEffect(() => {
+    if (!player?._id) return;
+    let active = true;
+    setLoading(true);
+    api(`/users/${player._id}`)
+      .then((data) => {
+        if (!active) return;
+        setProfile({ ...data.user, recentDuels: data.recentDuels || [] });
+        setAmount(data.user?.minStake || 1000);
+      })
+      .catch(() => {
+        if (active) setProfile(player);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [player?._id]);
+
+  if (!player) return <p>Sélectionnez un joueur.</p>;
+
+  const current = profile || player;
+  const recentDuels = current.recentDuels || [];
+  const trustScore = Math.round((Number(current.reputation || 0) + Number(current.winRate || 0)) / 2);
+
+  async function challenge() {
+    try {
+      await api('/challenges', { method: 'POST', body: { challengedId: current._id, amount: Number(amount), message } });
+      setStatus('Défi envoyé.');
+    } catch (err) {
+      setStatus(err.message);
+    }
+  }
+
+  return (
+    <div className="stack">
+      <section className="profile">
+        <img src={current.avatar || `https://api.dicebear.com/9.x/bottts/svg?seed=${current.username}`} alt="" />
+        <div>
+          <p className={`status-pill status-pill--${current.status === 'online' || current.status === 'available' ? 'success' : current.status === 'busy' ? 'warning' : 'neutral'}`}>{humanizeStatus(current.status)}</p>
+          <h1>{current.username}</h1>
+          <p>{current.country} · {current.level} · {current.badge}</p>
+          <p className="muted">Mise minimale {money(current.minStake)} · mise maximale {money(current.maxStake)} · Confiance {trustScore}/100</p>
+        </div>
+      </section>
+      <div className="grid stats">
+        <Stat icon={Trophy} label="Victoires" value={current.wins} />
+        <Stat icon={Medal} label="Taux de victoire" value={`${current.winRate}%`} />
+        <Stat icon={Banknote} label="Gains" value={money(current.totalEarnings)} />
+        <Stat icon={Shield} label="Réputation" value={current.reputation || 0} />
+      </div>
+      <section className="panel form">
+        <h2>Défier ce joueur</h2>
+        {loading && <p className="muted">Chargement du profil complet...</p>}
+        <input type="number" min={current.minStake} max={current.maxStake} value={amount} onChange={(e) => setAmount(e.target.value)} />
+        <textarea placeholder="Message optionnel" value={message} onChange={(e) => setMessage(e.target.value)} />
+        <button onClick={challenge} type="button"><Swords size={18} />Envoyer un défi</button>
+        {status && <p className="muted">{status}</p>}
+      </section>
+      <section className="panel">
+        <h2>Derniers duels</h2>
+        <DataList
+          rows={recentDuels}
+          empty="Aucun duel terminé à afficher"
+          render={(duel) => (
+            <div className="row">
+              <span>
+                {duel.player1?.username} vs {duel.player2?.username}
+                <small className="text-gray-300">{duel.status} · {duel.winner?.username || 'Sans vainqueur'} · {timeAgo(duel.finishedAt || duel.createdAt)}</small>
+              </span>
+              <strong className="text-white">{money(duel.potTotal)}</strong>
+            </div>
+          )}
+        />
       </section>
       <button className="secondary" type="button" onClick={() => setView('players')}>Retour</button>
     </div>
@@ -1213,6 +1423,94 @@ function OcrCard({ title, score, confidence, players = [], text }) {
       <span className="text-gray-300">Confiance: <strong className={confidence >= 85 ? 'text-cyber-accent' : 'text-cyber-warning'}>{confidence || 0}%</strong></span>
       <small className="text-gray-400">Joueurs détectés: {players.length ? players.join(', ') : '-'}</small>
       {text && <details><summary>Texte détecté</summary><p className="text-gray-300">{text}</p></details>}
+    </div>
+  );
+}
+
+function Activity({ liveFeed = [], setView }) {
+  const [publicChallenges, setPublicChallenges] = useState([]);
+  const [recentDuels, setRecentDuels] = useState([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      api('/challenges/public?limit=12'),
+      api('/duels')
+    ])
+      .then(([publicData, duelsData]) => {
+        if (!active) return;
+        setPublicChallenges(publicData.challenges || []);
+        setRecentDuels(duelsData.duels || []);
+      })
+      .catch((err) => {
+        if (active) setError(err.message);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return (
+    <div className="stack">
+      <header className="page-head">
+        <span>
+          <p className="eyebrow">Activité en direct</p>
+          <h1>Mur d'activité</h1>
+        </span>
+        <button type="button" className="secondary" onClick={() => setView('duels')}>Voir les duels</button>
+      </header>
+      {error && <section className="panel"><p className="error">{error}</p></section>}
+      <div className="grid two">
+        <section className="panel" aria-labelledby="activity-live-title">
+          <h2 id="activity-live-title">Flux temps réel</h2>
+          <DataList
+            rows={liveFeed}
+            empty="Aucune activité récente"
+            render={(item) => (
+              <div className="row">
+                <span>
+                  {item.text}
+                  <small className="text-gray-300">{timeAgo(item.time)}</small>
+                </span>
+              </div>
+            )}
+          />
+        </section>
+        <section className="panel" aria-labelledby="activity-public-title">
+          <h2 id="activity-public-title">Défis publics</h2>
+          <DataList
+            rows={publicChallenges}
+            empty="Aucun défi public pour le moment"
+            render={(challenge) => (
+              <div className="row">
+                <span>
+                  {challenge.challenger?.username} ↔ {challenge.challenged?.username || 'Ouvert'}
+                  <small className="text-gray-300">{challenge.matchType} · {money(challenge.amount)} · {humanizeStatus(challenge.status)}</small>
+                </span>
+                <strong className="text-white">{timeAgo(challenge.createdAt)}</strong>
+              </div>
+            )}
+          />
+        </section>
+      </div>
+      <section className="panel">
+        <h2>Derniers duels</h2>
+        <DataList
+          rows={recentDuels}
+          empty="Aucun duel terminé"
+          render={(duel) => (
+            <div className="row">
+              <span>
+                {duel.player1?.username} vs {duel.player2?.username}
+                <small className="text-gray-300">{duel.status} · {timeAgo(duel.finishedAt || duel.createdAt)}</small>
+              </span>
+              <strong className="text-white">{money(duel.potTotal)}</strong>
+            </div>
+          )}
+        />
+      </section>
     </div>
   );
 }

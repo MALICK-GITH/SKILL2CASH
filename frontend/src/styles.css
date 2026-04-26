@@ -22,9 +22,9 @@ h1, h2, p { margin: 0; }
 h1 { font-size: clamp(2rem, 5vw, 4.8rem); line-height: .95; letter-spacing: 0; }
 h2 { font-size: 1.15rem; }
 small { color: var(--muted); display: block; margin-top: 3px; }
-main { min-height: 100vh; display: grid; grid-template-columns: 280px 1fr; }
+main { min-height: 100vh; display: grid; grid-template-columns: 280px 1fr; padding-top: 76px; }
 
-.sidebar { border-right: 1px solid var(--line); background: rgba(8,10,12,.9); padding: 18px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 18px; }
+.sidebar { border-right: 1px solid var(--line); background: rgba(8,10,12,.9); padding: 18px; position: sticky; top: 76px; height: calc(100vh - 76px); display: flex; flex-direction: column; gap: 18px; }
 .brand { justify-content: flex-start; background: transparent; border-color: transparent; padding: 0; }
 .brand-mark { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid var(--green); border-radius: 8px; color: var(--green); font-weight: 900; }
 nav { display: grid; gap: 8px; }
@@ -118,6 +118,12 @@ nav button.active { color: var(--green); background: #0e1f17; border-color: #254
 .ocr-card { display: grid; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 12px; background: #080b0d; }
 .ocr-card details { color: var(--muted); }
 .ocr-card details p { margin-top: 8px; white-space: pre-wrap; max-height: 180px; overflow: auto; }
+.community-banner { position: fixed; top: 12px; left: 18px; right: 18px; z-index: 6; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 12px 14px; border: 1px solid rgba(41,255,135,.35); border-radius: 8px; background: rgba(8, 14, 11, .96); box-shadow: 0 0 30px rgba(41,255,135,.18); }
+.community-banner-copy { display: grid; gap: 2px; min-width: 0; }
+.community-banner-copy strong { color: var(--green); }
+.community-banner-copy span { color: var(--muted); font-size: .92rem; }
+.community-banner-action, .community-banner-close { white-space: nowrap; }
+.public-wall { margin-top: 24px; }
 .toast { position: fixed; right: 18px; top: 18px; z-index: 5; display: flex; align-items: center; gap: 10px; max-width: 360px; background: #112019; border: 1px solid var(--green); color: var(--text); padding: 12px 14px; border-radius: 8px; box-shadow: 0 0 30px rgba(41,255,135,.25); cursor: pointer; }
 
 @media (max-width: 900px) {
@@ -130,4 +136,5 @@ nav button.active { color: var(--green); background: #0e1f17; border-color: #254
   .podium { grid-template-columns: 1fr; }
   .page-head, .row, .profile { align-items: stretch; flex-direction: column; }
   .inbox-item { grid-template-columns: 1fr; align-items: stretch; }
+  .community-banner { grid-template-columns: 1fr; }
 }
