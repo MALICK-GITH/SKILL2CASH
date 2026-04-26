@@ -110,13 +110,14 @@ export async function recoverFromCrash() {
         const expectedTotal = wallet.balanceAvailable + wallet.balanceLocked;
         if (Math.abs(wallet.balanceTotal - expectedTotal) > 1) {
           // Corriger l'incohérence
+          const previousTotal = wallet.balanceTotal;
           wallet.balanceTotal = expectedTotal;
           await wallet.save({ session });
           recoveryResults.walletsRecovered++;
           
           await logCriticalAction('recovery:wallet_corrected', wallet.user, {
             walletId: wallet._id,
-            oldTotal: wallet.balanceTotal,
+            oldTotal: previousTotal,
             newTotal: expectedTotal
           });
         }

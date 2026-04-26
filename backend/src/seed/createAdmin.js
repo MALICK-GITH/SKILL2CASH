@@ -6,7 +6,7 @@ import { ensureWallet } from '../services/walletService.js';
 const ADMIN_CONFIG = {
   username: process.env.ADMIN_USERNAME || 'admin',
   email: process.env.ADMIN_EMAIL || 'admin@skill2cash.com',
-  password: process.env.ADMIN_PASSWORD || 'ChangeMeNow123!',
+  password: process.env.ADMIN_PASSWORD,
   country: process.env.ADMIN_COUNTRY || 'Cote d Ivoire',
   level: process.env.ADMIN_LEVEL || 'Elite',
   role: 'admin'
@@ -14,6 +14,10 @@ const ADMIN_CONFIG = {
 
 export async function createAdmin() {
   try {
+    if (!ADMIN_CONFIG.password) {
+      throw new Error('ADMIN_PASSWORD is required to create the admin account');
+    }
+
     await connectDatabase();
 
     const existing = await User.findOne({ email: ADMIN_CONFIG.email });
