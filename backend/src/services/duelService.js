@@ -124,12 +124,14 @@ export async function submitResult(duelId, userId, result) {
       if (isPlayer1) {
         duel.ocrTextPlayer1 = ocr.text;
         duel.ocrScorePlayer1 = ocr.score;
+        duel.ocrScoreCandidatesPlayer1 = ocr.scoreCandidates || [];
         duel.ocrPlayersDetectedPlayer1 = ocr.playersDetected;
         duel.ocrConfidencePlayer1 = ocr.confidence;
       }
       if (isPlayer2) {
         duel.ocrTextPlayer2 = ocr.text;
         duel.ocrScorePlayer2 = ocr.score;
+        duel.ocrScoreCandidatesPlayer2 = ocr.scoreCandidates || [];
         duel.ocrPlayersDetectedPlayer2 = ocr.playersDetected;
         duel.ocrConfidencePlayer2 = ocr.confidence;
       }

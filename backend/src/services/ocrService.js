@@ -1,27 +1,75 @@
 const OCR_MIN_CONFIDENCE = 85;
 
-function normalizeText(value) {
+function foldText(value) {
   return String(value || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function normalizeText(value) {
+  return foldText(value)
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
 
+function compactText(value) {
+  return normalizeText(value).replace(/\s+/g, '');
+}
+
 export function normalizeScore(value) {
-  const match = String(value || '').match(/\b(\d{1,2})\s*[-:]\s*(\d{1,2})\b/);
+  const match = String(value || '').match(/\b(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/);
   return match ? `${Number(match[1])}-${Number(match[2])}` : '';
 }
 
-function detectScore(text) {
-  return normalizeScore(text);
+export function extractScoreCandidates(text) {
+  const candidates = [];
+  const seen = new Set();
+  const variants = [foldText(text), normalizeText(text)];
+  const patterns = [
+    /\b(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/g,
+    /\bscore\s*(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/g,
+    /\bresult(?:at)?\s*(?:final)?\s*(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/g,
+    /\b(?:ft|full time|final)\s*(\d{1,2})\s*[-:\/]\s*(\d{1,2})\b/g
+  ];
+
+  for (const variant of variants) {
+    for (const pattern of patterns) {
+      pattern.lastIndex = 0;
+      for (const match of variant.matchAll(pattern)) {
+        const score = `${Number(match[1])}-${Number(match[2])}`;
+        if (!seen.has(score)) {
+          seen.add(score);
+          candidates.push(score);
+        }
+      }
+    }
+  }
+
+  return candidates;
 }
 
-function detectPlayers(text, players) {
+function detectScore(text) {
+  return extractScoreCandidates(text)[0] || '';
+}
+
+export function detectPlayersFromText(text, players = []) {
   const normalizedText = normalizeText(text);
+  const compact = compactText(text);
+
   return players
-    .filter((player) => normalizeText(player.username).length >= 3 && normalizedText.includes(normalizeText(player.username)))
+    .filter((player) => {
+      const username = String(player?.username || '');
+      const normalizedUsername = normalizeText(username);
+      if (normalizedUsername.length < 3) return false;
+
+      const compactUsername = compactText(username);
+      if (compact.includes(compactUsername)) return true;
+      if (normalizedText.includes(normalizedUsername)) return true;
+
+      const usernameTokens = normalizedUsername.split(/\s+/).filter((token) => token.length >= 3);
+      return usernameTokens.length > 0 && usernameTokens.every((token) => normalizedText.includes(token));
+    })
     .map((player) => player.username);
 }
 
@@ -49,6 +97,18 @@ function getValidImageBuffer(screenshot) {
   return isPng || isJpeg || isWebp ? buffer : null;
 }
 
+async function recognizePass(worker, imageBuffer, parameters = {}) {
+  if (worker.setParameters) {
+    await worker.setParameters(parameters).catch(() => {});
+  }
+
+  const result = await worker.recognize(imageBuffer);
+  return {
+    text: result.data?.text || '',
+    confidence: Math.round(result.data?.confidence || 0)
+  };
+}
+
 export async function analyzeMatchScreenshot(screenshot, players) {
   const imageBuffer = getValidImageBuffer(screenshot);
   if (!imageBuffer) {
@@ -67,25 +127,41 @@ export async function analyzeMatchScreenshot(screenshot, players) {
   try {
     const { createWorker } = await import('tesseract.js');
     worker = await createWorker('eng');
-    const result = await worker.recognize(imageBuffer);
 
-    const text = result.data?.text || '';
-    const score = detectScore(text);
-    const confidence = Math.round(result.data?.confidence || 0);
-    const playersDetected = detectPlayers(text, players);
+    const generalPass = await recognizePass(worker, imageBuffer, {
+      preserve_interword_spaces: '1',
+      tessedit_pageseg_mode: '6'
+    });
+    const digitsPass = await recognizePass(worker, imageBuffer, {
+      preserve_interword_spaces: '1',
+      tessedit_pageseg_mode: '6',
+      tessedit_char_whitelist: '0123456789-:/scoreresultfinalft '
+    });
+
+    const combinedText = [generalPass.text, digitsPass.text].filter(Boolean).join('\n').trim();
+    const scoreCandidates = extractScoreCandidates([digitsPass.text, generalPass.text].join('\n'));
+    const score = scoreCandidates[0] || detectScore(combinedText);
+    const playersDetected = detectPlayersFromText(combinedText, players);
+    const confidence = Math.max(generalPass.confidence, digitsPass.confidence);
 
     return {
-      text,
+      text: combinedText,
       score,
+      scoreCandidates,
       playersDetected,
       confidence,
+      passes: {
+        general: generalPass,
+        digits: digitsPass
+      },
       probableWinner: probableWinnerFromScore(score, players),
-      status: confidence >= OCR_MIN_CONFIDENCE ? 'ok' : 'low_confidence'
+      status: confidence >= OCR_MIN_CONFIDENCE && Boolean(score) ? 'ok' : 'low_confidence'
     };
   } catch (error) {
     return {
       text: '',
       score: '',
+      scoreCandidates: [],
       playersDetected: [],
       confidence: 0,
       probableWinner: null,

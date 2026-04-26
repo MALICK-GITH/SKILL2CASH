@@ -1406,8 +1406,8 @@ function DuelRoom({ duelId, user, setView, onRefresh }) {
       <section className="panel" aria-labelledby="ocr-validation-title">
         <h2 id="ocr-validation-title">Validation OCR</h2>
         <div className="grid two">
-          <OcrCard title={duel.player1?.username} score={duel.ocrScorePlayer1} confidence={duel.ocrConfidencePlayer1} players={duel.ocrPlayersDetectedPlayer1} text={duel.ocrTextPlayer1} />
-          <OcrCard title={duel.player2?.username} score={duel.ocrScorePlayer2} confidence={duel.ocrConfidencePlayer2} players={duel.ocrPlayersDetectedPlayer2} text={duel.ocrTextPlayer2} />
+          <OcrCard title={duel.player1?.username} score={duel.ocrScorePlayer1} candidates={duel.ocrScoreCandidatesPlayer1} confidence={duel.ocrConfidencePlayer1} players={duel.ocrPlayersDetectedPlayer1} text={duel.ocrTextPlayer1} />
+          <OcrCard title={duel.player2?.username} score={duel.ocrScorePlayer2} candidates={duel.ocrScoreCandidatesPlayer2} confidence={duel.ocrConfidencePlayer2} players={duel.ocrPlayersDetectedPlayer2} text={duel.ocrTextPlayer2} />
         </div>
         <p className="muted">{duel.autoValidationStatus}: {duel.autoValidationReason || 'En attente des deux captures.'}</p>
       </section>
@@ -1415,12 +1415,13 @@ function DuelRoom({ duelId, user, setView, onRefresh }) {
   );
 }
 
-function OcrCard({ title, score, confidence, players = [], text }) {
+function OcrCard({ title, score, candidates = [], confidence, players = [], text }) {
   return (
     <div className="ocr-card" role="region" aria-label={`Résultat OCR pour ${title}`}>
       <b className="text-white">{title}</b>
       <span className="text-gray-300">Score OCR: <strong className="text-white">{score || '-'}</strong></span>
       <span className="text-gray-300">Confiance: <strong className={confidence >= 85 ? 'text-cyber-accent' : 'text-cyber-warning'}>{confidence || 0}%</strong></span>
+      <small className="text-gray-400">Candidats score: {candidates.length ? candidates.join(', ') : '-'}</small>
       <small className="text-gray-400">Joueurs détectés: {players.length ? players.join(', ') : '-'}</small>
       {text && <details><summary>Texte détecté</summary><p className="text-gray-300">{text}</p></details>}
     </div>

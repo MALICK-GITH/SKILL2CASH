@@ -35,6 +35,8 @@ const duelSchema = new mongoose.Schema(
     ocrTextPlayer2: { type: String, default: '' },
     ocrScorePlayer1: { type: String, default: '' },
     ocrScorePlayer2: { type: String, default: '' },
+    ocrScoreCandidatesPlayer1: [{ type: String }],
+    ocrScoreCandidatesPlayer2: [{ type: String }],
     ocrPlayersDetectedPlayer1: [{ type: String }],
     ocrPlayersDetectedPlayer2: [{ type: String }],
     ocrConfidencePlayer1: { type: Number, default: 0 },
