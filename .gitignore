@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.local
+coverage/
+npm-debug.log*
+uploads/
+.audit-logs/
+dev-verify.log
+dev-verify.err
