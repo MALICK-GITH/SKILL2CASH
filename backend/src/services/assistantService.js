@@ -176,6 +176,98 @@ async function buildOperationalContext(user) {
   return userBlocks.join('\n');
 }
 
+function buildLocalAssistantReply({ user, prompt, view, context }) {
+  const text = normalizeText(prompt);
+  const trust = user ? buildTrustProfile(user) : null;
+  const commonIntro = user
+    ? `Je suis l’assistant global SKILL2CASH pour ta vue ${view || 'global'}.`
+    : 'Je suis l’assistant global SKILL2CASH.';
+
+  if (/(wallet|portefeuille|solde|retrait|depot|dépôt)/.test(text)) {
+    return {
+      reply: [
+        commonIntro,
+        'Le wallet sépare le solde disponible, le solde bloqué et les opérations validées.',
+        user
+          ? `Pour ton compte: le solde et les mouvements sont visibles dans le wallet, avec une confiance de ${trust?.score ?? 0}/100.`
+          : 'Ouvre le wallet pour voir ton solde, tes dépôts et tes retraits.',
+        'Si tu veux, je peux te dire quoi faire pour déposer ou retirer.'
+      ].join('\n'),
+      provider: 'local-fallback',
+      model: 'local'
+    };
+  }
+
+  if (/(profil|profile|compte|mon profil)/.test(text)) {
+    return {
+      reply: [
+        commonIntro,
+        user
+          ? `Ton profil affiche ${user.wins} victoire(s), ${user.losses} défaite(s), une série de ${user.currentStreak} et une confiance de ${trust?.score ?? 0}/100.`
+          : 'Le profil affiche les informations publiques du joueur, sa confiance et son activité.',
+        'Je peux aussi t’expliquer chaque bloc du profil si tu veux.'
+      ].join('\n'),
+      provider: 'local-fallback',
+      model: 'local'
+    };
+  }
+
+  if (/(confiance|trust)/.test(text)) {
+    const signals = trust?.signals?.slice(0, 3).map((signal) => signal.label).join(' · ') || 'signaux de fiabilité, activité et litiges';
+    return {
+      reply: [
+        commonIntro,
+        `La confiance résume la fiabilité du joueur sur 100.`,
+        `Niveau actuel: ${trust?.score ?? 0}/100. ${trust?.tierLabel || 'Profil évalué automatiquement'}.`,
+        `Signaux clés: ${signals}.`
+      ].join('\n'),
+      provider: 'local-fallback',
+      model: 'local'
+    };
+  }
+
+  if (/(défi|defi|duel|lancer|challenge)/.test(text)) {
+    return {
+      reply: [
+        commonIntro,
+        'Pour lancer un défi: choisis un joueur, définis la mise, vérifie ton solde disponible, puis envoie la demande.',
+        'Le système bloque la mise, ouvre la salle du duel et suit le résultat jusqu’à la validation.',
+        'Je peux te guider étape par étape si tu veux.'
+      ].join('\n'),
+      provider: 'local-fallback',
+      model: 'local'
+    };
+  }
+
+  if (/(joueur|affront|adversaire|rencontre)/.test(text)) {
+    return {
+      reply: [
+        commonIntro,
+        'Je peux chercher un joueur déjà affronté si tu me le demandes clairement.',
+        'Exemple: "Trouve-moi un joueur déjà affronté".'
+      ].join('\n'),
+      provider: 'local-fallback',
+      model: 'local'
+    };
+  }
+
+  const contextSummary = context
+    ? 'Le site suit les défis, les duels, le wallet, la confiance et les actions admin.'
+    : 'Je peux t’expliquer les pages du site, les duels, le wallet et la confiance.';
+
+  return {
+    reply: [
+      commonIntro,
+      contextSummary,
+      user
+        ? 'Je peux aussi t’aider avec ton profil, ton wallet, tes défis ou un joueur déjà affronté.'
+        : 'Pose-moi une question précise et je te répondrai directement.'
+    ].join('\n'),
+    provider: 'local-fallback',
+    model: 'local'
+  };
+}
+
 function summarizePastOpponents(duels, user) {
   const map = new Map();
 
@@ -353,17 +445,15 @@ export async function generateAssistantReply({ req, message, messages = [], view
   const providers = env.aiModel.startsWith('gpt-') || !looksLikeAnthropicBaseUrl(env.aiBaseUrl)
     ? [callOpenAICompatibleApi, callAnthropicLikeApi]
     : [callAnthropicLikeApi, callOpenAICompatibleApi];
-  const errors = [];
-
   for (const provider of providers) {
     try {
       return await provider({ messages: payloadMessages, system, model: env.aiModel, maxTokens });
     } catch (error) {
-      errors.push(error);
+      void error;
     }
   }
 
-  throw errors[errors.length - 1] || new AppError('Impossible de joindre l’assistant IA', 503);
+  return buildLocalAssistantReply({ user, prompt, view, context });
 }
 
-export { buildOperationalContext, buildSystemPrompt, normalizeMessages, resolveProviderUrl, extractAnthropicText, extractOpenAIText, looksLikeAnthropicBaseUrl, resolveAuthHeaders, shouldResolveLocalAction, extractOpponentSearchQuery, findPastOpponents };
+export { buildLocalAssistantReply, buildOperationalContext, buildSystemPrompt, normalizeMessages, resolveProviderUrl, extractAnthropicText, extractOpenAIText, looksLikeAnthropicBaseUrl, resolveAuthHeaders, shouldResolveLocalAction, extractOpponentSearchQuery, findPastOpponents };

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildSystemPrompt, extractAnthropicText, extractOpenAIText, extractOpponentSearchQuery, looksLikeAnthropicBaseUrl, normalizeMessages, resolveProviderUrl, shouldResolveLocalAction } from '../src/services/assistantService.js';
+import { buildLocalAssistantReply, buildSystemPrompt, extractAnthropicText, extractOpenAIText, extractOpponentSearchQuery, looksLikeAnthropicBaseUrl, normalizeMessages, resolveProviderUrl, shouldResolveLocalAction } from '../src/services/assistantService.js';
 
 test('assistant helpers keep only usable messages and trim history', () => {
   const messages = normalizeMessages([
@@ -41,4 +41,26 @@ test('assistant system prompt includes site rules', () => {
   const prompt = buildSystemPrompt({ user: null, view: 'dashboard', context: 'Site' });
   assert.match(prompt, /SKILL2CASH/);
   assert.match(prompt, /dashboard/);
+});
+
+test('assistant local fallback answers common site questions without provider access', () => {
+  const reply = buildLocalAssistantReply({
+    user: {
+      username: 'Malick',
+      role: 'user',
+      wins: 12,
+      losses: 3,
+      currentStreak: 4,
+      trustScore: 81,
+      trustTier: 'fiable',
+      trustProfile: { score: 81, tierLabel: 'Fiable', signals: [{ label: 'Compte actif' }] }
+    },
+    prompt: 'Comment fonctionne le wallet ?',
+    view: 'dashboard',
+    context: ''
+  });
+
+  assert.equal(reply.provider, 'local-fallback');
+  assert.match(reply.reply, /wallet/i);
+  assert.match(reply.reply, /confiance/i);
 });
