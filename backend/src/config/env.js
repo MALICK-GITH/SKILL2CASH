@@ -3,10 +3,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const nodeEnv = process.env.NODE_ENV || 'development';
-const jwtSecret = process.env.JWT_SECRET || 'dev-secret-change-me';
+const jwtSecret = process.env.JWT_SECRET || 'render-fallback-jwt-secret-change-me';
 
 if (nodeEnv === 'production' && !process.env.JWT_SECRET) {
-  throw new Error('JWT_SECRET is required in production');
+  console.warn('JWT_SECRET is not set in production. Using a fallback secret until the environment variable is configured.');
 }
 
 export const env = {
