@@ -13,7 +13,7 @@
     "seed": "npm run seed --prefix backend",
     "seed:memory": "npm run seed:memory --prefix backend",
     "test": "npm run test --prefix backend",
-    "build": "npm run build --prefix frontend"
+    "build": "npm install --prefix frontend && npm run build --prefix frontend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
