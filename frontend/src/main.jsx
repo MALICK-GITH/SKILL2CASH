@@ -424,7 +424,8 @@ function App() {
             </div>
             <div className="mx-4 mb-3 flex gap-2">
               <a href="https://chat.whatsapp.com/EL4j85SBKiIL7UI9NfeSAB" target="_blank" rel="noopener noreferrer" className="cyber-card flex-1 flex items-center justify-center gap-2 text-sm" aria-label="Rejoindre le groupe WhatsApp officiel">
-                💬 WhatsApp
+                <MessageSquare size={18} aria-hidden="true" />
+                WhatsApp
               </a>
             </div>
             <button className="ghost mx-4 mb-4 text-cyber-danger hover:text-cyber-secondary transition-colors" onClick={logout} aria-label="Se déconnecter"><LogOut size={18} aria-hidden="true" />Déconnexion</button>
@@ -489,7 +490,7 @@ function Landing({ setView }) {
         <div className="actions">
           <button onClick={() => setView('register')} aria-label="Créer un compte et commencer à jouer"><Gamepad2 size={18} aria-hidden="true" />Commencer à jouer</button>
           <button className="secondary" onClick={() => setView('login')} aria-label="Se connecter à son compte">Connexion</button>
-          <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noopener noreferrer" className="secondary" aria-label="Rejoindre le groupe WhatsApp officiel">
+          <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noopener noreferrer" className="cyber-button secondary" aria-label="Rejoindre le groupe WhatsApp officiel">
             <MessageSquare size={18} aria-hidden="true" />
             Groupe WhatsApp
           </a>
