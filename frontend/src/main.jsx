@@ -16,8 +16,10 @@ import {
   MessageSquare,
   Search,
   Shield,
+  Send,
   Swords,
   Trophy,
+  X,
   UserRound,
   Wallet
 } from 'lucide-react';
@@ -27,12 +29,34 @@ import './styles.css';
 const money = (value) => `${Number(value || 0).toLocaleString('fr-FR')} CFA`;
 const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/EL4j85SBKiIL7UI9NfeSAB';
 const WHATSAPP_NOTICE_KEY = 'skill2cash_whatsapp_notice_hidden';
+const ASSISTANT_STORAGE_KEY = 'skill2cash_global_assistant';
+
+const DEFAULT_ASSISTANT_MESSAGES = [
+  {
+    role: 'assistant',
+    content: 'Je suis l’assistant global SKILL2CASH. Je peux t’expliquer le site, les duels, le wallet, la fiabilité et les actions admin.'
+  }
+];
+
+function loadAssistantState() {
+  try {
+    const value = JSON.parse(localStorage.getItem(ASSISTANT_STORAGE_KEY));
+    if (!value || !Array.isArray(value.messages)) return { messages: DEFAULT_ASSISTANT_MESSAGES };
+    return { messages: value.messages.slice(-20) };
+  } catch {
+    return { messages: DEFAULT_ASSISTANT_MESSAGES };
+  }
+}
+
+function saveAssistantState(messages) {
+  localStorage.setItem(ASSISTANT_STORAGE_KEY, JSON.stringify({ messages: messages.slice(-20) }));
+}
 
 function timeAgo(value) {
   const timestamp = new Date(value).getTime();
   if (Number.isNaN(timestamp)) return '';
   const diffMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
-  if (diffMinutes < 1) return 'a l\'instant';
+  if (diffMinutes < 1) return 'à l\'instant';
   if (diffMinutes < 60) return `${diffMinutes} min`;
   const diffHours = Math.floor(diffMinutes / 60);
   if (diffHours < 24) return `${diffHours} h`;
@@ -89,6 +113,152 @@ function humanizeStatus(status = '') {
     paid: 'Payé'
   };
   return labels[status] || status || 'Inconnu';
+}
+
+function getTrustProfile(entity = {}) {
+  const safeEntity = entity ?? {};
+  const profile = safeEntity.trustProfile || {};
+  const score = Number(profile.score ?? safeEntity.trustScore ?? 0);
+  const safeScore = Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0;
+  return {
+    score: safeScore,
+    tier: profile.tier || '',
+    tierLabel: profile.tierLabel || safeEntity.trustTier || (safeScore >= 90 ? 'Référence' : safeScore >= 75 ? 'Elite' : safeScore >= 60 ? 'Solide' : safeScore >= 40 ? 'Fiable' : 'Sous surveillance'),
+    riskLabel: profile.riskLabel || (safeScore >= 90 ? 'Risque très faible' : safeScore >= 70 ? 'Risque faible' : safeScore >= 50 ? 'Risque modéré' : safeScore >= 30 ? 'Risque élevé' : 'Risque critique'),
+    recommendedStakeCap: Number(profile.recommendedStakeCap ?? safeEntity.recommendedStakeCap ?? safeEntity.maxStake ?? 0) || 0,
+    summary: profile.summary || '',
+    signals: Array.isArray(profile.signals) ? profile.signals : []
+  };
+}
+
+function trustTone(score = 0) {
+  if (score >= 85) return 'success';
+  if (score >= 60) return 'warning';
+  return 'danger';
+}
+
+function TrustPanel({ entity, compact = false }) {
+  const trust = getTrustProfile(entity);
+  const signals = compact ? trust.signals.slice(0, 2) : trust.signals.slice(0, 4);
+
+  return (
+    <section className={`trust-panel ${compact ? 'trust-panel--compact' : ''}`}>
+      <div className="trust-panel-head">
+        <span className="eyebrow">Trust Engine</span>
+        <b className={`status-pill status-pill--${trustTone(trust.score)}`}>{trust.score}/100</b>
+      </div>
+      <div className="trust-meter" aria-hidden="true">
+        <span className={`trust-meter-fill trust-meter-fill--${trustTone(trust.score)}`} style={{ width: `${trust.score}%` }} />
+      </div>
+      <div className="trust-meta">
+        <strong>{trust.tierLabel}</strong>
+        <small>{trust.riskLabel}</small>
+      </div>
+      {!compact && trust.summary && <p className="muted">{trust.summary}</p>}
+      <div className="trust-signals">
+        {!compact && <small className="text-gray-300">Mise recommandée: {money(trust.recommendedStakeCap)}</small>}
+        {signals.map((signal) => (
+          <span key={signal.label} className={`trust-signal trust-signal--${signal.tone || 'neutral'}`}>{signal.label}</span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function GlobalAssistant({ user, view }) {
+  const [open, setOpen] = useState(false);
+  const [messages, setMessages] = useState(() => loadAssistantState().messages);
+  const [draft, setDraft] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    saveAssistantState(messages);
+  }, [messages]);
+
+  async function ask(question) {
+    const content = String(question || draft || '').trim();
+    if (!content || loading) return;
+
+    const nextMessages = [...messages, { role: 'user', content }];
+    setMessages(nextMessages);
+    setDraft('');
+    setLoading(true);
+    setError('');
+
+    try {
+      const data = await api('/assistant/chat', {
+        method: 'POST',
+        body: {
+          message: content,
+          messages: messages.slice(-8),
+          view
+        }
+      });
+      setMessages((current) => [...current, { role: 'assistant', content: data.reply || 'Je n’ai pas de réponse fiable pour le moment.' }].slice(-20));
+    } catch (err) {
+      setError(err.message);
+      setMessages((current) => [...current, { role: 'assistant', content: 'Le service IA est indisponible pour le moment.' }].slice(-20));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const quickPrompts = [
+    'Explique-moi mon profil',
+    'Comment fonctionne le wallet ?',
+    'Comment lancer un défi ?',
+    'Comment lire la confiance ?',
+    "Trouve un joueur déjà affronté"
+  ];
+
+  return (
+    <>
+      <button type="button" className="assistant-launcher" onClick={() => setOpen((state) => !state)} aria-label={open ? 'Fermer l’assistant IA' : 'Ouvrir l’assistant IA'}>
+        <MessageSquare size={18} aria-hidden="true" />
+        IA
+      </button>
+      <aside className={`assistant-panel ${open ? 'assistant-panel--open' : ''}`} aria-hidden={!open}>
+        <header className="assistant-header">
+          <div>
+            <span className="eyebrow">Assistant global</span>
+            <strong>SKILL2CASH IA</strong>
+          </div>
+          <button type="button" className="assistant-close" onClick={() => setOpen(false)} aria-label="Fermer l’assistant">
+            <X size={16} aria-hidden="true" />
+          </button>
+        </header>
+        <div className="assistant-quick">
+          {quickPrompts.map((prompt) => (
+            <button key={prompt} type="button" className="assistant-quick-chip" onClick={() => ask(prompt)} disabled={loading}>
+              {prompt}
+            </button>
+          ))}
+        </div>
+        <div className="assistant-messages" role="log" aria-live="polite">
+          {messages.map((message, index) => (
+            <div key={`${message.role}-${index}`} className={`assistant-message assistant-message--${message.role}`}>
+              <span>{message.content}</span>
+            </div>
+          ))}
+          {loading && <div className="assistant-message assistant-message--assistant"><span>Réflexion en cours...</span></div>}
+        </div>
+        {error && <p className="assistant-error">{error}</p>}
+        <div className="assistant-input">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Pose ta question sur le site..."
+            rows={3}
+          />
+          <button type="button" className="cyber-button" onClick={() => ask()} disabled={loading || !draft.trim()}>
+            <Send size={16} aria-hidden="true" />
+            Envoyer
+          </button>
+        </div>
+      </aside>
+    </>
+  );
 }
 
 async function loadSections(requests) {
@@ -221,7 +391,7 @@ function App() {
         <div className="community-banner" role="region" aria-label="Groupe WhatsApp officiel">
           <div className="community-banner-copy">
             <strong>Groupe WhatsApp officiel</strong>
-            <span>Les d?fis publics se lancent ici, puis la salle est cr??e sur le site pour officialiser le pari.</span>
+            <span>Les défis publics se lancent ici, puis la salle est créée sur le site pour officialiser le pari.</span>
           </div>
           <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noopener noreferrer" className="cyber-button community-banner-action" aria-label="Rejoindre le groupe WhatsApp officiel">
             <MessageSquare size={18} aria-hidden="true" />
@@ -256,9 +426,6 @@ function App() {
               <a href="https://chat.whatsapp.com/EL4j85SBKiIL7UI9NfeSAB" target="_blank" rel="noopener noreferrer" className="cyber-card flex-1 flex items-center justify-center gap-2 text-sm" aria-label="Rejoindre le groupe WhatsApp officiel">
                 💬 WhatsApp
               </a>
-              <a href="#" target="_blank" rel="noopener noreferrer" className="cyber-card flex-1 flex items-center justify-center gap-2 text-sm" aria-label="Rejoindre le serveur Discord">
-                🎮 Discord
-              </a>
             </div>
             <button className="ghost mx-4 mb-4 text-cyber-danger hover:text-cyber-secondary transition-colors" onClick={logout} aria-label="Se déconnecter"><LogOut size={18} aria-hidden="true" />Déconnexion</button>
           </>
@@ -285,6 +452,7 @@ function App() {
         {user && view === 'history' && <HistoryView refreshTick={refreshTick} />}
         {user && view === 'admin' && <Admin />}
       </section>
+      <GlobalAssistant user={user} view={view} />
     </main>
   );
 }
@@ -320,7 +488,7 @@ function Landing({ setView }) {
         <p>Bienvenue sur SKILL2CASH, la plateforme où ton niveau eFootball devient ton argent. Défie des joueurs du monde entier, prouve ton skill, gagne tes duels et encaisse tes gains.</p>
         <div className="actions">
           <button onClick={() => setView('register')} aria-label="Créer un compte et commencer à jouer"><Gamepad2 size={18} aria-hidden="true" />Commencer à jouer</button>
-          <button className="secondary" onClick={() => setView('login')} aria-label="Se connecter ? son compte">Connexion</button>
+          <button className="secondary" onClick={() => setView('login')} aria-label="Se connecter à son compte">Connexion</button>
           <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noopener noreferrer" className="secondary" aria-label="Rejoindre le groupe WhatsApp officiel">
             <MessageSquare size={18} aria-hidden="true" />
             Groupe WhatsApp
@@ -348,7 +516,7 @@ function Landing({ setView }) {
                 <span>
                   {challenge.challenger?.username} ↔ {challenge.challenged?.username || 'Ouvert'}
                   <small className="text-gray-300">
-                    {challenge.matchType} · {money(challenge.amount)} · {humanizeStatus(challenge.status)}
+                    {challenge.matchType} · {money(challenge.amount)} · {humanizeStatus(challenge.status)} · Confiance {challenge.challenger?.trustScore ?? 0}/100
                   </small>
                 </span>
                 <strong className="text-white">{timeAgo(challenge.createdAt)}</strong>
@@ -365,7 +533,7 @@ function Landing({ setView }) {
 }
 
 function Auth({ mode, setUser, setView }) {
-  const [form, setForm] = useState({ username: '', email: '', password: '', country: 'Cote d Ivoire' });
+  const [form, setForm] = useState({ username: '', email: '', password: '', country: "Côte d'Ivoire" });
   const [error, setError] = useState('');
 
   async function submit(event) {
@@ -527,7 +695,7 @@ function Dashboard({ user, liveFeed = [], setView, setSelectedDuel, refreshTick,
     try {
       await api('/users/username-change-requests', { method: 'POST', body: usernameRequest });
       setUsernameRequest({ requestedUsername: '', reason: '' });
-      setUsernameMessage('Demande envoyee. Un admin doit valider avant tout changement.');
+      setUsernameMessage('Demande envoyée. Un admin doit valider avant tout changement.');
     } catch (error) {
       setUsernameMessage(error.message);
     }
@@ -608,6 +776,7 @@ function Dashboard({ user, liveFeed = [], setView, setSelectedDuel, refreshTick,
               {remainingForNextLevel > 0 ? `${money(remainingForNextLevel)} à gagner pour le prochain palier` : 'Palier maximal atteint'}
             </small>
           </div>
+          <TrustPanel entity={user} compact />
         </div>
       </section>
 
@@ -702,7 +871,7 @@ function Dashboard({ user, liveFeed = [], setView, setSelectedDuel, refreshTick,
 
       <section className="panel form" aria-labelledby="username-title">
         <h2 id="username-title">Nom eFootball officiel</h2>
-        <p className="muted">Ton username SKILL2CASH doit etre identique a ton nom dans eFootball pour permettre la validation OCR.</p>
+        <p className="muted">Ton username SKILL2CASH doit être identique à ton nom dans eFootball pour permettre la validation OCR.</p>
         <input value={user?.username || ''} disabled aria-label="Nom d'utilisateur actuel" />
         <input placeholder="Nouveau nom eFootball exact" value={usernameRequest.requestedUsername} onChange={(e) => setUsernameRequest({ ...usernameRequest, requestedUsername: e.target.value })} />
         <textarea placeholder="Raison de la demande" value={usernameRequest.reason} onChange={(e) => setUsernameRequest({ ...usernameRequest, reason: e.target.value })} />
@@ -787,7 +956,7 @@ function WalletView({ refreshTick, onRefresh }) {
       await api('/wallet/withdraw', { method: 'POST', body: { ...withdraw, amount: Number(withdraw.amount) } });
       await load();
       onRefresh?.();
-      setMessage('Demande de retrait envoyee.');
+      setMessage('Demande de retrait envoyée.');
     } catch (error) {
       setMessage(error.message);
     }
@@ -800,7 +969,7 @@ function WalletView({ refreshTick, onRefresh }) {
           <p className="eyebrow">Portefeuille interne</p>
           <h1>Portefeuille</h1>
         </span>
-        <p className="muted">Les soldes disponibles, bloques et en attente sont séparés pour éviter toute confusion.</p>
+        <p className="muted">Les soldes disponibles, bloqués et en attente sont séparés pour éviter toute confusion.</p>
       </header>
       <div className="grid stats">
         <Stat icon={Wallet} label="Disponible" value={money(state?.wallet?.balanceAvailable)} />
@@ -1035,7 +1204,7 @@ function Players({ currentUser, setSelectedPlayer, setView }) {
 function PlayerCard({ player, onClick }) {
   const minStake = money(player.minStake);
   const maxStake = money(player.maxStake);
-  const trustScore = Math.round((Number(player.reputation || 0) + Number(player.winRate || 0)) / 2);
+  const trust = getTrustProfile(player);
   return (
     <button className="player-card" type="button" onClick={onClick}>
       <img src={player.avatar || `https://api.dicebear.com/9.x/bottts/svg?seed=${player.username}`} alt="" />
@@ -1044,8 +1213,9 @@ function PlayerCard({ player, onClick }) {
         <small>{player.country} · {player.level}</small>
       </span>
       <b>{player.rank}</b>
+      <small className={`trust-chip trust-chip--${trustTone(trust.score)}`}>{trust.score}/100 · {trust.tierLabel}</small>
       <small>{player.wins}V / {player.losses}D · {player.winRate}%</small>
-      <small>Fiabilité {player.reputation || 0}/100 · Confiance {trustScore}/100</small>
+      <small>Réputation {player.reputation || 0}/100 · {trust.riskLabel}</small>
       <small><b className={`status-pill status-pill--${player.status === 'online' || player.status === 'available' ? 'success' : player.status === 'busy' ? 'warning' : 'neutral'}`}>{humanizeStatus(player.status)}</b></small>
       <small>Mise {minStake} - {maxStake}</small>
     </button>
@@ -1056,6 +1226,7 @@ function PlayerProfile({ player, setView }) {
   const [amount, setAmount] = useState(player?.minStake || 1000);
   const [message, setMessage] = useState('');
   const [status, setStatus] = useState('');
+  const trust = getTrustProfile(player);
   if (!player) return <p>Sélectionnez un joueur.</p>;
 
   async function challenge() {
@@ -1084,6 +1255,7 @@ function PlayerProfile({ player, setView }) {
         <Stat icon={Banknote} label="Gains" value={money(player.totalEarnings)} />
         <Stat icon={Shield} label="Réputation" value={player.reputation || 0} />
       </div>
+      <TrustPanel entity={{ ...player, trustProfile: trust }} />
       <section className="panel form">
         <h2>Défier ce joueur</h2>
         <input type="number" min={player.minStake} max={player.maxStake} value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -1129,7 +1301,7 @@ function PlayerProfileDetails({ player, setView }) {
 
   const current = profile || player;
   const recentDuels = current.recentDuels || [];
-  const trustScore = Math.round((Number(current.reputation || 0) + Number(current.winRate || 0)) / 2);
+  const trust = getTrustProfile(current);
 
   async function challenge() {
     try {
@@ -1148,7 +1320,7 @@ function PlayerProfileDetails({ player, setView }) {
           <p className={`status-pill status-pill--${current.status === 'online' || current.status === 'available' ? 'success' : current.status === 'busy' ? 'warning' : 'neutral'}`}>{humanizeStatus(current.status)}</p>
           <h1>{current.username}</h1>
           <p>{current.country} · {current.level} · {current.badge}</p>
-          <p className="muted">Mise minimale {money(current.minStake)} · mise maximale {money(current.maxStake)} · Confiance {trustScore}/100</p>
+          <p className="muted">Mise minimale {money(current.minStake)} · mise maximale {money(current.maxStake)} · Confiance {trust.score}/100</p>
         </div>
       </section>
       <div className="grid stats">
@@ -1157,6 +1329,7 @@ function PlayerProfileDetails({ player, setView }) {
         <Stat icon={Banknote} label="Gains" value={money(current.totalEarnings)} />
         <Stat icon={Shield} label="Réputation" value={current.reputation || 0} />
       </div>
+      <TrustPanel entity={{ ...current, trustProfile: trust }} />
       <section className="panel form">
         <h2>Défier ce joueur</h2>
         {loading && <p className="muted">Chargement du profil complet...</p>}
@@ -1537,14 +1710,18 @@ function Leaderboard() {
       <section className="panel">
         <h2>Podium du moment</h2>
         <div className="podium">
-          {podium.length ? podium.map((player, index) => (
-            <div key={player._id || index} className={`podium-card podium-card-${index + 1}`}>
-              <span className="podium-rank">#{index + 1}</span>
-              <strong>{player.username}</strong>
-              <small>{player.country} · {player.rank}</small>
-              <b>{money(player.totalEarnings)}</b>
-            </div>
-          )) : <p className="muted">Aucun podium pour le moment.</p>}
+          {podium.length ? podium.map((player, index) => {
+            const trust = getTrustProfile(player);
+            return (
+              <div key={player._id || index} className={`podium-card podium-card-${index + 1}`}>
+                <span className="podium-rank">#{index + 1}</span>
+                <strong>{player.username}</strong>
+                <small>{player.country} · {player.rank}</small>
+                <small className={`trust-chip trust-chip--${trustTone(trust.score)}`}>{trust.score}/100 · {trust.tierLabel}</small>
+                <b>{money(player.totalEarnings)}</b>
+              </div>
+            );
+          }) : <p className="muted">Aucun podium pour le moment.</p>}
         </div>
       </section>
       <div className="grid two">
@@ -1553,7 +1730,20 @@ function Leaderboard() {
       </div>
       <div className="grid two">
         <Board title="Meilleur taux de victoire" rows={data?.topWinRate} value={(u) => `${Math.round(u.winRateCalc || u.winRate || 0)}%`} />
+        <Board title="Joueurs les plus fiables" rows={data?.topTrust} value={(u) => `${u.trustProfile?.score ?? u.trustScore ?? 0}/100`} />
+      </div>
+      <div className="grid two">
         <CountryBoard rows={data?.byCountry} />
+        <section className="panel" aria-labelledby="trust-explainer-title">
+          <h2 id="trust-explainer-title">Comment lire le score</h2>
+          <div className="summary-stack">
+            <div className="summary-line"><span>90+ </span><strong>Référence</strong></div>
+            <div className="summary-line"><span>75-89</span><strong>Elite</strong></div>
+            <div className="summary-line"><span>60-74</span><strong>Solide</strong></div>
+            <div className="summary-line"><span>40-59</span><strong>Fiable</strong></div>
+            <div className="summary-line"><span>0-39</span><strong>Sous surveillance</strong></div>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -1862,7 +2052,7 @@ function Admin() {
           <div className="row">
             <span>
               {user.username}
-              <small className="text-gray-300">{user.email} · {user.country || 'Pays non renseigné'} · {user.isBanned ? 'banni' : 'actif'}</small>
+              <small className="text-gray-300">{user.email} · {user.country || 'Pays non renseigné'} · {user.isBanned ? 'banni' : 'actif'} · Confiance {user.trustScore ?? 0}/100 · {user.trustTier || 'Sous surveillance'}</small>
             </span>
             <div className="inline">
               <button className={user.isBanned ? 'secondary' : 'danger'} onClick={() => banUser(user._id, !user.isBanned)}>

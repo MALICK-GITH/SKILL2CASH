@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { calculateCommission } from '../src/services/commissionService.js';
 import { shouldAutoApproveWithOcr } from '../src/services/ocrService.js';
 import { badgeForUser, rankForUser } from '../src/services/rankService.js';
+import { buildTrustProfile, calculateTrustScore } from '../src/services/trustService.js';
 import { validateEfootballUsername } from '../src/utils/username.js';
 
 test('commission is deducted from the total pot', () => {
@@ -10,6 +11,25 @@ test('commission is deducted from the total pot', () => {
     commissionAmount: 200,
     winnerAmount: 1800
   });
+});
+
+test('trust score does not over-reward legacy users without username lock state', () => {
+  const locked = calculateTrustScore({
+    wins: 20,
+    losses: 2,
+    reputation: 90,
+    reportsCount: 0,
+    usernameLocked: true
+  });
+
+  const legacy = calculateTrustScore({
+    wins: 20,
+    losses: 2,
+    reputation: 90,
+    reportsCount: 0
+  });
+
+  assert.equal(locked - legacy, 4);
 });
 
 test('rank grows with winnings and wins', () => {
@@ -45,4 +65,37 @@ test('OCR auto approval requires matching declarations and high confidence', () 
 test('eFootball username is validated as the official SKILL2CASH username', () => {
   assert.equal(validateEfootballUsername('NeymarJr'), 'NeymarJr');
   assert.throws(() => validateEfootballUsername('bad name with spaces'));
+});
+
+test('trust score rewards reliable and consistent players', () => {
+  const strongProfile = {
+    wins: 42,
+    losses: 4,
+    currentStreak: 7,
+    maxStreak: 11,
+    totalEarnings: 180000,
+    reputation: 96,
+    reportsCount: 0,
+    usernameLocked: true,
+    minStake: 1000,
+    maxStake: 25000
+  };
+
+  const riskyProfile = {
+    wins: 3,
+    losses: 11,
+    currentStreak: 0,
+    maxStreak: 1,
+    totalEarnings: 1200,
+    reputation: 38,
+    reportsCount: 4,
+    usernameLocked: false,
+    minStake: 1000,
+    maxStake: 5000
+  };
+
+  assert.ok(calculateTrustScore(strongProfile) > calculateTrustScore(riskyProfile));
+  const trust = buildTrustProfile(strongProfile);
+  assert.equal(trust.tierLabel, 'Référence');
+  assert.ok(trust.recommendedStakeCap <= strongProfile.maxStake);
 });

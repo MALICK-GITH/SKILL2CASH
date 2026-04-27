@@ -16,5 +16,9 @@ export const env = {
   jwtSecret,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
-  platformWalletId: process.env.PLATFORM_WALLET_ID || 'platform'
+  platformWalletId: process.env.PLATFORM_WALLET_ID || 'platform',
+  aiBaseUrl: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
+  aiToken: process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || '',
+  aiModel: process.env.ANTHROPIC_MODEL || process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || 'claude-sonnet-4-20250514',
+  aiMaxTokens: Number(process.env.ANTHROPIC_MAX_TOKENS || 700)
 };

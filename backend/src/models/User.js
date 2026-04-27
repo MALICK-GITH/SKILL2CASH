@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
+import { buildTrustProfile, calculateTrustScore, trustTierForScore } from '../services/trustService.js';
 
 const userSchema = new mongoose.Schema(
   {
@@ -34,6 +35,18 @@ const userSchema = new mongoose.Schema(
 userSchema.virtual('winRate').get(function getWinRate() {
   const total = this.wins + this.losses;
   return total === 0 ? 0 : Math.round((this.wins / total) * 100);
+});
+
+userSchema.virtual('trustScore').get(function getTrustScore() {
+  return calculateTrustScore(this);
+});
+
+userSchema.virtual('trustTier').get(function getTrustTier() {
+  return trustTierForScore(calculateTrustScore(this)).label;
+});
+
+userSchema.virtual('trustProfile').get(function getTrustProfile() {
+  return buildTrustProfile(this);
 });
 
 userSchema.methods.comparePassword = function comparePassword(password) {

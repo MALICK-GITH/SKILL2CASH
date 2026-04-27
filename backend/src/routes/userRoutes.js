@@ -40,7 +40,11 @@ userRouter.get('/search', asyncHandler(async (req, res) => {
     if (req.query.maxStake) filter.maxStake = { $lte: Number(req.query.maxStake) };
   }
 
-  const sort = req.query.top === 'true' ? { totalEarnings: -1, wins: -1 } : req.query.new === 'true' ? { createdAt: -1 } : { status: 1, username: 1 };
+  const sort = req.query.top === 'true'
+    ? { totalEarnings: -1, wins: -1 }
+    : req.query.new === 'true'
+      ? { createdAt: -1 }
+      : { status: 1, reportsCount: 1, reputation: -1, wins: -1, totalEarnings: -1, username: 1 };
   const users = await User.find(filter).select(publicFields).sort(sort).skip(skip).limit(limit);
   res.json({ users, page, limit });
 }));
@@ -79,6 +83,24 @@ userRouter.patch('/profile', protect, asyncHandler(async (req, res) => {
   for (const field of allowed) {
     if (req.body[field] !== undefined) req.user[field] = req.body[field];
   }
+
+  if (req.body.level !== undefined && !['Beginner', 'Intermediate', 'Pro', 'Elite'].includes(req.user.level)) {
+    throw new AppError('Le niveau de profil est invalide', 422);
+  }
+  if (req.body.status !== undefined && !['online', 'offline', 'busy', 'available'].includes(req.user.status)) {
+    throw new AppError('Le statut de profil est invalide', 422);
+  }
+
+  if (req.user.minStake !== undefined && (!Number.isFinite(Number(req.user.minStake)) || Number(req.user.minStake) < 0)) {
+    throw new AppError('La mise minimale doit être un nombre positif ou nul', 422);
+  }
+  if (req.user.maxStake !== undefined && (!Number.isFinite(Number(req.user.maxStake)) || Number(req.user.maxStake) < 0)) {
+    throw new AppError('La mise maximale doit être un nombre positif ou nul', 422);
+  }
+  if (req.user.minStake !== undefined && req.user.maxStake !== undefined && Number(req.user.minStake) > Number(req.user.maxStake)) {
+    throw new AppError('La mise minimale ne peut pas dépasser la mise maximale', 422);
+  }
+
   await req.user.save();
   res.json({ user: req.user });
 }));

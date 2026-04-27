@@ -11,6 +11,16 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const challengeRouter = express.Router();
 
+function requireOpenChallenge(challenge) {
+  if (!challenge) throw new AppError('Défi non trouvé', 404);
+  if (!['pending', 'counter_offer'].includes(challenge.status)) {
+    throw new AppError('Ce défi n\'est plus modifiable', 422);
+  }
+  if (challenge.expiresAt < new Date()) {
+    throw new AppError('Défi expiré', 422);
+  }
+}
+
 challengeRouter.get('/public', asyncHandler(async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit || 12), 1), 24);
   const challenges = await Challenge.find({ status: { $in: ['pending', 'counter_offer'] } })
@@ -81,7 +91,7 @@ challengeRouter.post('/:id/accept', asyncHandler(async (req, res) => {
 
 challengeRouter.post('/:id/decline', asyncHandler(async (req, res) => {
   const challenge = await Challenge.findOne({ _id: req.params.id, challenged: req.user._id });
-  if (!challenge) throw new AppError('Défi non trouvé', 404);
+  requireOpenChallenge(challenge);
   challenge.status = 'declined';
   await challenge.save();
   notifyUser(challenge.challenger, 'challenge:declined', { challengeId: challenge._id });
@@ -90,9 +100,13 @@ challengeRouter.post('/:id/decline', asyncHandler(async (req, res) => {
 
 challengeRouter.post('/:id/counter', requireFields(['counterAmount']), asyncHandler(async (req, res) => {
   const challenge = await Challenge.findOne({ _id: req.params.id, challenged: req.user._id });
-  if (!challenge) throw new AppError('Défi non trouvé', 404);
+  requireOpenChallenge(challenge);
+  const counterAmount = Number(req.body.counterAmount);
+  if (!Number.isFinite(counterAmount) || counterAmount <= 0) {
+    throw new AppError('Le montant de contre-proposition doit être positif', 422);
+  }
   challenge.status = 'counter_offer';
-  challenge.counterAmount = Number(req.body.counterAmount);
+  challenge.counterAmount = counterAmount;
   await challenge.save();
   notifyUser(challenge.challenger, 'challenge:counter_offer', { challengeId: challenge._id, counterAmount: challenge.counterAmount });
   res.json({ challenge });
@@ -101,7 +115,12 @@ challengeRouter.post('/:id/counter', requireFields(['counterAmount']), asyncHand
 challengeRouter.post('/:id/cancel', asyncHandler(async (req, res) => {
   const challenge = await Challenge.findOne({ _id: req.params.id, challenger: req.user._id });
   if (!challenge) throw new AppError('Défi non trouvé', 404);
-  if (challenge.status === 'accepted') throw new AppError('Un défi accepté ne peut être annulé ici', 422);
+  if (!['pending', 'counter_offer'].includes(challenge.status)) {
+    throw new AppError('Un défi déjà traité ne peut pas être annulé ici', 422);
+  }
+  if (challenge.expiresAt < new Date()) {
+    throw new AppError('Défi expiré', 422);
+  }
   challenge.status = 'cancelled';
   await challenge.save();
   notifyUser(challenge.challenged, 'challenge:cancelled', { challengeId: challenge._id });

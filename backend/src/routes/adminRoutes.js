@@ -320,13 +320,32 @@ adminRouter.get('/commissions', asyncHandler(async (_req, res) => {
 }));
 
 adminRouter.post('/commissions', requireFields(['name', 'minAmount', 'rate']), asyncHandler(async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const minAmount = Number(req.body.minAmount);
+  const maxAmount = req.body.maxAmount === undefined || req.body.maxAmount === '' ? null : Number(req.body.maxAmount);
+  const rate = Number(req.body.rate);
+  const type = req.body.type || 'duel';
+  const active = req.body.active === undefined ? true : req.body.active === true || req.body.active === 'true';
+
+  if (!name) throw new AppError('Le nom de la commission est requis', 422);
+  if (!Number.isFinite(minAmount) || minAmount < 0) throw new AppError('Le montant minimum doit être un nombre positif ou nul', 422);
+  if (maxAmount !== null && (!Number.isFinite(maxAmount) || maxAmount < minAmount)) {
+    throw new AppError('Le montant maximum doit être supérieur ou égal au minimum', 422);
+  }
+  if (!Number.isFinite(rate) || rate <= 0 || rate > 1) {
+    throw new AppError('Le taux doit être compris entre 0 et 1', 422);
+  }
+  if (!['duel', 'tournament'].includes(type)) {
+    throw new AppError('Le type de commission est invalide', 422);
+  }
+
   const setting = await CommissionSetting.create({
-    name: req.body.name,
-    minAmount: Number(req.body.minAmount),
-    maxAmount: req.body.maxAmount === undefined || req.body.maxAmount === '' ? null : Number(req.body.maxAmount),
-    rate: Number(req.body.rate),
-    type: req.body.type || 'duel',
-    active: req.body.active ?? true
+    name,
+    minAmount,
+    maxAmount,
+    rate,
+    type,
+    active: Boolean(active)
   });
   res.status(201).json({ setting });
 }));

@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { env } from './config/env.js';
 import { adminRouter } from './routes/adminRoutes.js';
+import { assistantRouter } from './routes/assistantRoutes.js';
 import { authRouter } from './routes/authRoutes.js';
 import { challengeRouter } from './routes/challengeRoutes.js';
 import { duelRouter } from './routes/duelRoutes.js';
@@ -42,7 +43,8 @@ export function createApp() {
       challenges: '/api/challenges',
       duels: '/api/duels',
       leaderboard: '/api/leaderboard',
-      admin: '/api/admin'
+      admin: '/api/admin',
+      assistant: '/api/assistant'
     }
   }));
   app.get('/api/health', (_req, res) => res.json({ ok: true, name: 'SKILL2CASH API' }));
@@ -53,6 +55,7 @@ export function createApp() {
   app.use('/api/duels', duelRouter);
   app.use('/api/leaderboard', leaderboardRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/assistant', assistantRouter);
 
   app.use(notFound);
   app.use(errorHandler);
