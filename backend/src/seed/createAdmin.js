@@ -7,7 +7,7 @@ const ADMIN_CONFIG = {
   username: process.env.ADMIN_USERNAME || 'admin',
   email: process.env.ADMIN_EMAIL || 'admin@skill2cash.com',
   password: process.env.ADMIN_PASSWORD,
-  country: process.env.ADMIN_COUNTRY || 'Cote d Ivoire',
+  country: process.env.ADMIN_COUNTRY || "Côte d'Ivoire",
   level: process.env.ADMIN_LEVEL || 'Elite',
   role: 'admin'
 };
