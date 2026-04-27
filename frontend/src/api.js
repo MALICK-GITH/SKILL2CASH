@@ -1,4 +1,26 @@
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
+
+function isLocalHost(hostname = '') {
+  return LOCAL_HOSTS.has(String(hostname).toLowerCase());
+}
+
+function resolveApiUrl() {
+  const configured = import.meta.env.VITE_API_URL?.trim();
+  if (!configured) return '/api';
+  if (configured.startsWith('/')) return configured;
+
+  try {
+    const url = new URL(configured, window.location.origin);
+    if (isLocalHost(url.hostname) && !isLocalHost(window.location.hostname)) {
+      return '/api';
+    }
+    return url.pathname.endsWith('/api') ? url.href : `${url.origin}/api`;
+  } catch {
+    return '/api';
+  }
+}
+
+const API_URL = resolveApiUrl();
 
 export function getSocketUrl() {
   if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
