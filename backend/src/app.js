@@ -1,4 +1,6 @@
 import cors from 'cors';
+import fs from 'node:fs';
+import path from 'node:path';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -17,6 +19,8 @@ import { isAllowedOrigin } from './utils/origin.js';
 
 export function createApp() {
   const app = express();
+  const frontendDist = path.resolve(process.cwd(), '../frontend/dist');
+  const frontendIndex = path.join(frontendDist, 'index.html');
   const allowedOrigins = env.clientUrl ? new Set([env.clientUrl]) : new Set();
   const corsOrigin = (origin, callback) => {
     if (env.nodeEnv === 'development' || isAllowedOrigin(origin, allowedOrigins)) {
@@ -31,22 +35,33 @@ export function createApp() {
   app.use(express.json({ limit: '2mb' }));
   app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
   app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 250, standardHeaders: true, legacyHeaders: false }));
-
-  app.get('/', (_req, res) => res.json({ 
-    name: 'SKILL2CASH API', 
-    version: '1.0.0',
-    health: '/api/health',
-    endpoints: {
-      auth: '/api/auth',
-      users: '/api/users',
-      wallet: '/api/wallet',
-      challenges: '/api/challenges',
-      duels: '/api/duels',
-      leaderboard: '/api/leaderboard',
-      admin: '/api/admin',
-      assistant: '/api/assistant'
-    }
-  }));
+  if (fs.existsSync(frontendIndex)) {
+    app.use(express.static(frontendDist));
+    app.get('/', (_req, res) => res.sendFile(frontendIndex));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) {
+        next();
+        return;
+      }
+      res.sendFile(frontendIndex);
+    });
+  } else {
+    app.get('/', (_req, res) => res.json({
+      name: 'SKILL2CASH API',
+      version: '1.0.0',
+      health: '/api/health',
+      endpoints: {
+        auth: '/api/auth',
+        users: '/api/users',
+        wallet: '/api/wallet',
+        challenges: '/api/challenges',
+        duels: '/api/duels',
+        leaderboard: '/api/leaderboard',
+        admin: '/api/admin',
+        assistant: '/api/assistant'
+      }
+    }));
+  }
   app.get('/api/health', (_req, res) => res.json({ ok: true, name: 'SKILL2CASH API' }));
   app.use('/api/auth', authRouter);
   app.use('/api/users', userRouter);
