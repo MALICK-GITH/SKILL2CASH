@@ -292,16 +292,89 @@ nav button.active { color: var(--green); background: #0e1f17; border-color: #254
 }
 
 @media (max-width: 900px) {
-  main { grid-template-columns: 1fr; }
-  .sidebar { position: relative; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
-  nav { grid-template-columns: repeat(2, 1fr); }
-  .content { padding: 18px; }
-  .landing { margin: -18px; padding: 28px 18px; min-height: 760px; }
+  main { grid-template-columns: 1fr; padding-top: 0; }
+  .community-banner {
+    position: static;
+    margin: 12px 12px 0;
+    grid-template-columns: 1fr;
+    padding: 14px;
+    border-radius: 18px;
+  }
+  .community-banner-action, .community-banner-close { width: 100%; }
+  .sidebar {
+    position: relative;
+    top: auto;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    padding: 14px;
+    gap: 14px;
+    background: linear-gradient(180deg, rgba(8,10,12,.96), rgba(8,10,12,.88));
+    backdrop-filter: blur(14px);
+  }
+  .brand { width: 100%; }
+  nav {
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    padding: 2px 2px 8px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  nav button {
+    min-width: 120px;
+    scroll-snap-align: start;
+  }
+  nav button, .ghost { border-radius: 16px; }
+  .user-chip { margin-top: 0; }
+  .content { padding: 14px; }
+  .landing { margin: -14px; padding: 28px 16px 32px; min-height: auto; background-position: 60% center; }
+  .hero { gap: 16px; }
+  .hero h1 { font-size: clamp(2.8rem, 16vw, 4.3rem); letter-spacing: .02em; }
+  .hero p { font-size: 1rem; line-height: 1.55; }
+  .actions, .ticker { width: 100%; }
+  .actions > * { width: 100%; }
+  .community-link--hero { width: 100%; min-width: 0; }
   .stats, .two, .filters, .dashboard-hero { grid-template-columns: 1fr; }
   .podium { grid-template-columns: 1fr; }
   .page-head, .row, .profile { align-items: stretch; flex-direction: column; }
+  .row, .profile, .panel, .cyber-card, .trust-panel, .podium-card, .stat { border-radius: 18px; }
   .inbox-item { grid-template-columns: 1fr; align-items: stretch; }
   .community-banner { grid-template-columns: 1fr; }
   .assistant-panel, .assistant-launcher { right: 12px; }
-  .assistant-panel { left: 12px; width: auto; }
+  .assistant-panel {
+    left: 12px;
+    width: auto;
+    max-height: 68vh;
+    border-radius: 20px;
+  }
+  .assistant-launcher { min-width: 96px; }
+  .assistant-quick { gap: 6px; }
+  .assistant-quick-chip { flex: 1 1 calc(50% - 6px); }
+  .assistant-message { max-width: 100%; }
+}
+
+@media (max-width: 540px) {
+  .content { padding: 12px; }
+  .landing { margin: -12px; padding: 24px 14px 28px; }
+  .hero h1 { font-size: clamp(2.4rem, 18vw, 3.8rem); }
+  .hero h2 { font-size: 1.05rem; letter-spacing: .04em; }
+  .actions { gap: 8px; }
+  .actions > * {
+    min-height: 48px;
+    justify-content: center;
+  }
+  .community-link--sidebar,
+  .community-link--hero {
+    min-height: 50px;
+  }
+  .page-head h1 { font-size: clamp(1.7rem, 7vw, 2.4rem); }
+  .panel { padding: 16px; }
+  .trust-panel, .trust-panel--compact { padding: 14px; }
+  .assistant-panel {
+    bottom: 76px;
+    max-height: 66vh;
+    padding: 12px;
+  }
+  .assistant-input textarea { min-height: 80px; }
 }

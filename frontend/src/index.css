@@ -46,3 +46,21 @@
     @apply outline-none ring-2 ring-cyber-primary ring-offset-2 ring-offset-cyber-black;
   }
 }
+
+@media (hover: none) and (pointer: coarse) {
+  .cyber-card,
+  .cyber-button,
+  .community-link,
+  .assistant-launcher,
+  .assistant-quick-chip,
+  .assistant-close {
+    transform: none !important;
+  }
+
+  .cyber-card:hover,
+  .cyber-button:hover,
+  .community-link:hover {
+    transform: none !important;
+    box-shadow: inherit;
+  }
+}
