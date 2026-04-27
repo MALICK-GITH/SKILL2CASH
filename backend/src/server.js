@@ -16,7 +16,7 @@ async function main() {
   const io = new Server(server, {
     cors: {
       origin: (origin, callback) => {
-        if (isAllowedOrigin(origin, new Set([env.clientUrl]))) {
+        if (isAllowedOrigin(origin, env.clientUrl ? new Set([env.clientUrl]) : new Set())) {
           callback(null, true);
           return;
         }

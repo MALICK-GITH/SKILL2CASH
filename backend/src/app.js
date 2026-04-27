@@ -17,7 +17,7 @@ import { isAllowedOrigin } from './utils/origin.js';
 
 export function createApp() {
   const app = express();
-  const allowedOrigins = new Set([env.clientUrl]);
+  const allowedOrigins = env.clientUrl ? new Set([env.clientUrl]) : new Set();
   const corsOrigin = (origin, callback) => {
     if (env.nodeEnv === 'development' || isAllowedOrigin(origin, allowedOrigins)) {
       callback(null, true);

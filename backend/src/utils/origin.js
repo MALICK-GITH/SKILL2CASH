@@ -5,5 +5,7 @@ export function isLocalOrigin(origin) {
 }
 
 export function isAllowedOrigin(origin, allowedOrigins) {
-  return !origin || isLocalOrigin(origin) || allowedOrigins.has(origin);
+  if (!origin || isLocalOrigin(origin)) return true;
+  if (!allowedOrigins || allowedOrigins.size === 0) return true;
+  return allowedOrigins.has(origin);
 }
