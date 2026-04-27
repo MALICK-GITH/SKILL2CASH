@@ -1,4 +1,13 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
+export function getSocketUrl() {
+  if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
+  try {
+    return new URL(API_URL, window.location.origin).origin;
+  } catch {
+    return window.location.origin;
+  }
+}
 
 export function getToken() {
   return localStorage.getItem('skill2cash_token');

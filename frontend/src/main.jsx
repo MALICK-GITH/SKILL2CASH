@@ -23,7 +23,7 @@ import {
   UserRound,
   Wallet
 } from 'lucide-react';
-import { API_URL, api, clearSession, getStoredUser, getToken, setSession } from './api.js';
+import { api, clearSession, getSocketUrl, getStoredUser, getToken, setSession } from './api.js';
 import './styles.css';
 
 const money = (value) => `${Number(value || 0).toLocaleString('fr-FR')} CFA`;
@@ -302,7 +302,7 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-    const socket = io(API_URL.replace('/api', ''), { auth: { token: getToken() } });
+    const socket = io(getSocketUrl(), { auth: { token: getToken() } });
     const push = (message) => {
       setNotice(message);
     };
@@ -423,7 +423,7 @@ function App() {
               <span>{user.username}<small className="text-cyber-accent">{user.rank || 'Bronze'} joueur</small></span>
             </div>
             <div className="mx-4 mb-3 flex gap-2">
-              <a href="https://chat.whatsapp.com/EL4j85SBKiIL7UI9NfeSAB" target="_blank" rel="noopener noreferrer" className="cyber-card flex-1 flex items-center justify-center gap-2 text-sm" aria-label="Rejoindre le groupe WhatsApp officiel">
+              <a href="https://chat.whatsapp.com/EL4j85SBKiIL7UI9NfeSAB" target="_blank" rel="noopener noreferrer" className="community-link community-link--sidebar flex-1 text-sm" aria-label="Rejoindre le groupe WhatsApp officiel">
                 <MessageSquare size={18} aria-hidden="true" />
                 WhatsApp
               </a>
@@ -490,7 +490,7 @@ function Landing({ setView }) {
         <div className="actions">
           <button onClick={() => setView('register')} aria-label="Créer un compte et commencer à jouer"><Gamepad2 size={18} aria-hidden="true" />Commencer à jouer</button>
           <button className="secondary" onClick={() => setView('login')} aria-label="Se connecter à son compte">Connexion</button>
-          <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noopener noreferrer" className="cyber-button secondary" aria-label="Rejoindre le groupe WhatsApp officiel">
+          <a href={WHATSAPP_GROUP_URL} target="_blank" rel="noopener noreferrer" className="community-link community-link--hero" aria-label="Rejoindre le groupe WhatsApp officiel">
             <MessageSquare size={18} aria-hidden="true" />
             Groupe WhatsApp
           </a>
@@ -1446,7 +1446,7 @@ function DuelRoom({ duelId, user, setView, onRefresh }) {
 
   useEffect(() => {
     if (!duel?.roomId) return;
-    const socket = io(API_URL.replace('/api', ''), { auth: { token: getToken() } });
+    const socket = io(getSocketUrl(), { auth: { token: getToken() } });
     socketRef.current = socket;
     socket.emit('duel:join', duel.roomId);
     socket.on('duel:message', (msg) => setChat((items) => [...items, msg]));
