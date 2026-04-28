@@ -3,7 +3,7 @@ export const manualPaymentAccounts = {
     method: 'wave',
     label: 'Wave',
     accountName: 'SKILL2CASH SOLITAIRE HACK',
-    paymentNumber: '+225 05 76 45 98 76',
+    paymentNumber: '+2250576459875',
     instructions: [
       'Ouvre Wave et envoie exactement le montant choisi.',
       'Garde la capture du reçu de paiement.',
@@ -15,7 +15,7 @@ export const manualPaymentAccounts = {
     method: 'mtn',
     label: 'MTN Mobile Money',
     accountName: 'SKILL2CASH SOLITAIRE HACK',
-    paymentNumber: '+225 05 76 45 98 76',
+    paymentNumber: '+2250576459875',
     instructions: [
       'Envoie le montant via MTN Mobile Money au numéro indiqué.',
       'Vérifie le nom du compte avant de confirmer.',

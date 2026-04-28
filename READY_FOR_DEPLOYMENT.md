@@ -24,7 +24,7 @@ Le système SKILL2CASH est **fonnellement complet et sécurisé** pour le déplo
 - ✅ **Routes admin protégées** - Toutes les routes admin utilisent `protect` + `requireAdmin`
 - ✅ **Données démo désactivées en production** - Demo data uniquement en développement/memory mode
 - ✅ **Taux de commission ajusté** - 9% pour petits montants (0-4999 CFA)
-- ✅ **Numéros de paiement configurés** - Wave: +225 05 76 45 98 76, MTN: +225 05 76 45 98 76
+- ✅ **Numéros de paiement configurés** - Wave: +2250576459875, MTN: +2250576459875
 - ✅ **Messages d'erreur traduits** - Tous les messages API en français
 
 ### Fonctionnalités
@@ -171,8 +171,8 @@ npm run build
 - 20000+ CFA: 5%
 
 ### Numéros de Paiement
-- Wave: +225 05 76 45 98 76
-- MTN Mobile Money: +225 05 76 45 98 76
+- Wave: +2250576459875
+- MTN Mobile Money: +2250576459875
 
 ### Limites
 - Taille capture max: 750KB
