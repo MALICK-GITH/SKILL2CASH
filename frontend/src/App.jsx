@@ -6,6 +6,8 @@ import {
   Banknote,
   CheckCircle2,
   ChevronRight,
+  Eye,
+  EyeOff,
   Crown,
   Gamepad2,
   History,
@@ -557,6 +559,7 @@ function AuthView({ mode, onModeChange, onSuccess, onBack }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit(event) {
     event.preventDefault();
@@ -645,14 +648,24 @@ function AuthView({ mode, onModeChange, onSuccess, onBack }) {
 
           <label>
             Mot de passe
+            <div className="password-field">
             <input
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={form.password}
               onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
               placeholder="Au moins 8 caractères"
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
               required
             />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+              >
+                {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+              </button>
+            </div>
           </label>
 
           {error && <p className="error">{error}</p>}

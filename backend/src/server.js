@@ -8,8 +8,7 @@ import { autoApproveEligibleDeposits } from './services/depositService.js';
 import { recoverFromCrash, recoverMissingWithdrawalNotifications } from './services/recoveryService.js';
 import { configureSocket } from './socket.js';
 import { isAllowedOrigin } from './utils/origin.js';
-import { User } from './models/User.js';
-import { ensureWallet } from './services/walletService.js';
+import { upsertAdminAccount } from './services/adminBootstrapService.js';
 
 async function main() {
   await connectDatabase();
@@ -27,32 +26,16 @@ async function main() {
     console.error('Withdrawal notification recovery failed:', error.message);
   }
 
-  if (env.mongoUri === 'memory') {
-    const adminUsername = process.env.ADMIN_USERNAME;
-    const adminEmail = process.env.ADMIN_EMAIL;
-    const adminPassword = process.env.ADMIN_PASSWORD;
-    const existingAdmin = await User.findOne({ role: 'admin' });
-    if (!existingAdmin && adminUsername && adminEmail && adminPassword) {
-      const admin = await User.create({
-        username: adminUsername,
-        efootballUsername: process.env.ADMIN_EFOOTBALL_USERNAME || adminUsername,
-        email: adminEmail,
-        country: "Cote d'Ivoire",
-        level: 'Elite',
-        role: 'admin',
-        passwordHash: await User.hashPassword(adminPassword),
-        wins: 0,
-        losses: 0,
-        totalEarnings: 0,
-        status: 'available',
-        rank: 'Legend',
-        badge: 'System Admin',
-        avatar: 'https://api.dicebear.com/9.x/bottts/svg?seed=admin'
-      });
-      await ensureWallet(admin._id);
-      console.log(`Memory admin ready: ${adminEmail}`);
-    } else if (!existingAdmin) {
-      console.log('Memory admin not created. Set ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_PASSWORD to enable one.');
+  if (env.mongoUri === 'memory' || process.env.ADMIN_USERNAME || process.env.ADMIN_EMAIL || process.env.ADMIN_PASSWORD) {
+    try {
+      const result = await upsertAdminAccount({ createWallet: true });
+      console.log(`${env.mongoUri === 'memory' ? 'Memory admin' : 'Admin'} ready: ${result.admin.email}`);
+    } catch (error) {
+      if (env.mongoUri === 'memory') {
+        console.log('Memory admin not created. Set ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_PASSWORD to enable one.');
+      } else {
+        throw error;
+      }
     }
   }
 
