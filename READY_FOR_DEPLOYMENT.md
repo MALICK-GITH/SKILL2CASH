@@ -93,9 +93,7 @@ cd backend
 npm run create-admin
 ```
 
-**Credentiels par défaut (CHANGER IMMÉDIATEMENT):**
-- Email: admin@skill2cash.com
-- Password: Skill2Cash@2024!Admin
+Renseigne les variables `ADMIN_USERNAME`, `ADMIN_EMAIL` et `ADMIN_PASSWORD` dans `backend/.env`, puis exécute le script de création.
 
 **Option B: Modifier avant exécution**
 - Éditer `backend/src/seed/createAdmin.js`

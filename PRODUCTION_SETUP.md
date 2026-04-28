@@ -51,9 +51,8 @@ npm run create-admin
 ```
 
 This will create:
-- Email: admin@skill2cash.com
-- Password: Skill2Cash@2024!Admin
-- **CHANGE THESE CREDENTIALS IMMEDIATELY AFTER FIRST LOGIN**
+ - An admin account from the `ADMIN_*` values set in `backend/.env`
+ - **CHANGE THESE CREDENTIALS IMMEDIATELY AFTER FIRST LOGIN**
 
 ### 4. Update Frontend Configuration
 

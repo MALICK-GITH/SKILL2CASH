@@ -78,8 +78,7 @@ Backend:
 
 Frontend: `http://localhost:5173`
 
-If you need an admin account for a fresh deployment, create one with `npm run create-admin --prefix backend`.
-You can override the bootstrap admin identity with `ADMIN_USERNAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in `backend/.env`.
+If you need an admin account for a fresh deployment, set `ADMIN_USERNAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in `backend/.env` first, then run `npm run create-admin --prefix backend`.
 
 ## API Summary
 
