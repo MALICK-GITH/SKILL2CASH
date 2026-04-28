@@ -8,6 +8,7 @@ import { requireFields } from '../middleware/validate.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { getPagination } from '../utils/pagination.js';
+import { notifyAdmins, notifyUser } from '../services/notificationService.js';
 import { usernameRegex, validateEfootballUsername } from '../utils/username.js';
 
 export const userRouter = express.Router();
@@ -24,7 +25,12 @@ userRouter.get('/search', asyncHandler(async (req, res) => {
   const { page, limit, skip } = getPagination(req.query);
   const filter = { isBanned: false };
 
-  if (req.query.q) filter.username = { $regex: req.query.q, $options: 'i' };
+  if (req.query.q) {
+    filter.$or = [
+      { username: { $regex: req.query.q, $options: 'i' } },
+      { efootballUsername: { $regex: req.query.q, $options: 'i' } }
+    ];
+  }
   if (req.query.country) filter.country = req.query.country;
   if (req.query.level) filter.level = req.query.level;
   if (req.query.status) filter.status = req.query.status;
@@ -70,6 +76,16 @@ userRouter.post('/username-change-requests', protect, requireFields(['requestedU
     reason: req.body.reason || ''
   });
 
+  await notifyUser(req.user._id, 'username:change_requested', {
+    requestId: request._id,
+    requestedUsername: request.requestedUsername
+  });
+  await notifyAdmins('admin:username_change_pending', {
+    requestId: request._id,
+    username: req.user.username,
+    requestedUsername: request.requestedUsername
+  });
+
   res.status(201).json({ request });
 }));
 
@@ -80,6 +96,12 @@ userRouter.get('/username-change-requests/me', protect, asyncHandler(async (req,
 
 userRouter.patch('/profile', protect, asyncHandler(async (req, res) => {
   const allowed = ['avatar', 'country', 'level', 'status', 'minStake', 'maxStake'];
+  const previousStatus = req.user.status;
+  const previousCountry = req.user.country;
+  const previousLevel = req.user.level;
+  const previousMinStake = req.user.minStake;
+  const previousMaxStake = req.user.maxStake;
+
   for (const field of allowed) {
     if (req.body[field] !== undefined) req.user[field] = req.body[field];
   }
@@ -102,6 +124,31 @@ userRouter.patch('/profile', protect, asyncHandler(async (req, res) => {
   }
 
   await req.user.save();
+
+  if (
+    previousStatus !== req.user.status ||
+    previousCountry !== req.user.country ||
+    previousLevel !== req.user.level ||
+    String(previousMinStake ?? '') !== String(req.user.minStake ?? '') ||
+    String(previousMaxStake ?? '') !== String(req.user.maxStake ?? '')
+  ) {
+    await notifyUser(req.user._id, 'profile:updated', {
+      userId: req.user._id,
+      status: req.user.status,
+      statusLabel: req.user.status,
+      country: req.user.country,
+      level: req.user.level
+    });
+  }
+
+  if (previousStatus !== req.user.status) {
+    await notifyUser(req.user._id, 'profile:status_changed', {
+      userId: req.user._id,
+      status: req.user.status,
+      statusLabel: req.user.status
+    });
+  }
+
   res.json({ user: req.user });
 }));
 

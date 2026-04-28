@@ -4,7 +4,7 @@ import { User } from '../models/User.js';
 import { protect } from '../middleware/auth.js';
 import { requireFields } from '../middleware/validate.js';
 import { acceptChallenge } from '../services/duelService.js';
-import { notifyUser } from '../services/notificationService.js';
+import { notifyAdmins, notifyUser } from '../services/notificationService.js';
 import { ensureWallet } from '../services/walletService.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -24,8 +24,8 @@ function requireOpenChallenge(challenge) {
 challengeRouter.get('/public', asyncHandler(async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit || 12), 1), 24);
   const challenges = await Challenge.find({ status: { $in: ['pending', 'counter_offer'] } })
-    .populate('challenger', 'username avatar country rank status reputation winRate minStake maxStake')
-    .populate('challenged', 'username avatar country rank status reputation winRate minStake maxStake')
+    .populate('challenger', 'username efootballUsername avatar country rank status reputation winRate minStake maxStake')
+    .populate('challenged', 'username efootballUsername avatar country rank status reputation winRate minStake maxStake')
     .sort({ createdAt: -1 })
     .limit(limit);
 
@@ -70,17 +70,29 @@ challengeRouter.post('/', requireFields(['challengedId', 'amount']), asyncHandle
     expiresAt: new Date(Date.now() + minutes * 60 * 1000)
   });
 
-  notifyUser(challenged._id, 'challenge:new', { challengeId: challenge._id, from: req.user.username, amount });
+  await notifyUser(req.user._id, 'challenge:created', {
+    challengeId: challenge._id,
+    amount,
+    challengedUsername: challenged.efootballUsername || challenged.username
+  });
+  await notifyUser(challenged._id, 'challenge:new', { challengeId: challenge._id, from: req.user.efootballUsername || req.user.username, amount });
+  await notifyAdmins('admin:challenge_created', {
+    challengeId: challenge._id,
+    amount,
+    challengerId: req.user._id,
+    challengedId: challenged._id
+  });
+
   res.status(201).json({ challenge });
 }));
 
 challengeRouter.get('/incoming', asyncHandler(async (req, res) => {
-  const challenges = await Challenge.find({ challenged: req.user._id }).populate('challenger', 'username avatar country rank').sort({ createdAt: -1 });
+  const challenges = await Challenge.find({ challenged: req.user._id }).populate('challenger', 'username efootballUsername avatar country rank').sort({ createdAt: -1 });
   res.json({ challenges });
 }));
 
 challengeRouter.get('/outgoing', asyncHandler(async (req, res) => {
-  const challenges = await Challenge.find({ challenger: req.user._id }).populate('challenged', 'username avatar country rank').sort({ createdAt: -1 });
+  const challenges = await Challenge.find({ challenger: req.user._id }).populate('challenged', 'username efootballUsername avatar country rank').sort({ createdAt: -1 });
   res.json({ challenges });
 }));
 
@@ -94,7 +106,8 @@ challengeRouter.post('/:id/decline', asyncHandler(async (req, res) => {
   requireOpenChallenge(challenge);
   challenge.status = 'declined';
   await challenge.save();
-  notifyUser(challenge.challenger, 'challenge:declined', { challengeId: challenge._id });
+  await notifyUser(challenge.challenger, 'challenge:declined', { challengeId: challenge._id });
+  await notifyUser(challenge.challenged, 'challenge:declined', { challengeId: challenge._id });
   res.json({ challenge });
 }));
 
@@ -108,7 +121,8 @@ challengeRouter.post('/:id/counter', requireFields(['counterAmount']), asyncHand
   challenge.status = 'counter_offer';
   challenge.counterAmount = counterAmount;
   await challenge.save();
-  notifyUser(challenge.challenger, 'challenge:counter_offer', { challengeId: challenge._id, counterAmount: challenge.counterAmount });
+  await notifyUser(challenge.challenger, 'challenge:counter_offer', { challengeId: challenge._id, counterAmount: challenge.counterAmount });
+  await notifyUser(challenge.challenged, 'challenge:counter_offer', { challengeId: challenge._id, counterAmount: challenge.counterAmount });
   res.json({ challenge });
 }));
 
@@ -123,6 +137,7 @@ challengeRouter.post('/:id/cancel', asyncHandler(async (req, res) => {
   }
   challenge.status = 'cancelled';
   await challenge.save();
-  notifyUser(challenge.challenged, 'challenge:cancelled', { challengeId: challenge._id });
+  await notifyUser(challenge.challenged, 'challenge:cancelled', { challengeId: challenge._id });
+  await notifyUser(challenge.challenger, 'challenge:cancelled', { challengeId: challenge._id });
   res.json({ challenge });
 }));

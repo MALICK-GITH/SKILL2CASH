@@ -20,7 +20,17 @@ function resolveApiUrl() {
   }
 }
 
-const API_URL = resolveApiUrl();
+function resolveDefaultApiUrl() {
+  if (import.meta.env.DEV) {
+    const hostname = String(window.location.hostname || '').toLowerCase();
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:5000/api';
+    }
+  }
+  return '/api';
+}
+
+const API_URL = import.meta.env.VITE_API_URL?.trim() ? resolveApiUrl() : resolveDefaultApiUrl();
 
 export function getSocketUrl() {
   if (import.meta.env.VITE_SOCKET_URL) return import.meta.env.VITE_SOCKET_URL;
