@@ -29,6 +29,7 @@ import { api, clearSession, getSocketUrl, getStoredUser, getToken, setSession } 
 import './styles.css';
 
 const DEFAULT_METHOD = 'wave';
+const WHATSAPP_GROUP_URL = 'https://chat.whatsapp.com/EL4j85SBKiIL7UI9NfeSAB';
 
 function money(value) {
   return `${Number(value || 0).toLocaleString('fr-FR')} CFA`;
@@ -328,6 +329,14 @@ function App() {
               <strong>{toDisplayName(user)}</strong>
               <small>SK2C: {user.username}</small>
             </div>
+            <a
+              className="cta-link cta-link--sidebar"
+              href={WHATSAPP_GROUP_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              WhatsApp communauté
+            </a>
             <button type="button" className="ghost-button" onClick={logout}>
               <LogOut size={16} aria-hidden="true" />
               Sortir
@@ -481,8 +490,27 @@ function Landing({ onEnter, onRegister }) {
         <p className="eyebrow">Mobile-first duel platform</p>
         <h1>SKILL2CASH</h1>
         <p className="landing-text">
-          Ouvre, comprends et joue en quelques secondes. Un dashboard simple, un wallet clair, une boîte de réception propre et une salle de match dédiée au duel.
+          La plateforme des joueurs eFootball qui veulent du sérieux: inscription rapide, wallet clair, duels cadrés et suivi net jusqu’au paiement.
         </p>
+        <div className="landing-community">
+          <p className="landing-community-label">Communauté WhatsApp officielle</p>
+          <p className="landing-community-text">
+            Rejoins d’abord le groupe WhatsApp pour échanger avec la communauté, signaler les bugs,
+            proposer des améliorations et organiser les défis entre joueurs avant de venir jouer sur le site.
+          </p>
+          <div className="landing-community-actions">
+            <a
+              className="primary-button"
+              href={WHATSAPP_GROUP_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Rejoindre le WhatsApp
+              <ChevronRight size={16} aria-hidden="true" />
+            </a>
+            <span className="landing-community-note">Présente-toi, pose tes questions, puis crée ton compte.</span>
+          </div>
+        </div>
         <div className="landing-actions">
           <button type="button" className="primary-button" onClick={onEnter}>
             Se connecter
@@ -492,6 +520,14 @@ function Landing({ onEnter, onRegister }) {
             Créer un compte
           </button>
         </div>
+        <a
+          className="cta-link cta-link--soft"
+          href={WHATSAPP_GROUP_URL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Déjà prêt ? Rejoins le WhatsApp et entre dans la communauté avant de t’inscrire.
+        </a>
       </div>
 
       <div className="landing-grid">
