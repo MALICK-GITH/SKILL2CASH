@@ -20,9 +20,13 @@ const PLAYER2 = {
 };
 
 const ADMIN = {
-  email: process.env.ADMIN_EMAIL || 'admin@skill2cash.com',
-  password: process.env.ADMIN_PASSWORD || 'ChangeMeNow123!'
+  email: process.env.ADMIN_EMAIL,
+  password: process.env.ADMIN_PASSWORD
 };
+
+if (!ADMIN.email || !ADMIN.password) {
+  throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD are required for test_scenarios.js');
+}
 
 let player1Token = '';
 let player2Token = '';

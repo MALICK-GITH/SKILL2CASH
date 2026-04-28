@@ -23,11 +23,5 @@ leaderboardRouter.get('/', asyncHandler(async (req, res) => {
     { $limit: 20 },
     { $project: { passwordHash: 0, email: 0, blockedUsers: 0 } }
   ]);
-  const byCountry = await User.aggregate([
-    { $match: { isBanned: false } },
-    { $group: { _id: '$country', players: { $sum: 1 }, earnings: { $sum: '$totalEarnings' }, wins: { $sum: '$wins' } } },
-    { $sort: { earnings: -1 } },
-    { $limit: 20 }
-  ]);
-  res.json({ topEarnings, topWins, topTrust, topWinRate, byCountry });
+  res.json({ topEarnings, topWins, topTrust, topWinRate });
 }));

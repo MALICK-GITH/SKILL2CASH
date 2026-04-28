@@ -359,6 +359,10 @@ function App() {
                 <Bell size={16} aria-hidden="true" />
                 Boîte {unreadCount > 0 ? `(${unreadCount})` : ''}
               </button>
+              <button type="button" className="ghost-button" onClick={logout}>
+                <LogOut size={16} aria-hidden="true" />
+                Déconnexion
+              </button>
             </div>
           </header>
 
@@ -487,29 +491,25 @@ function Landing({ onEnter, onRegister }) {
   return (
     <section className="landing">
       <div className="landing-copy">
-        <p className="eyebrow">Mobile-first duel platform</p>
+        <p className="eyebrow">Plateforme mobile-first</p>
         <h1>SKILL2CASH</h1>
         <p className="landing-text">
-          La plateforme des joueurs eFootball qui veulent du sérieux: inscription rapide, wallet clair, duels cadrés et suivi net jusqu’au paiement.
+          Une interface claire pour gérer le wallet, lancer des duels et suivre chaque validation sans bruit inutile.
         </p>
         <div className="landing-community">
-          <p className="landing-community-label">Communauté WhatsApp officielle</p>
+          <p className="landing-community-label">Communauté WhatsApp</p>
           <p className="landing-community-text">
-            Rejoins d’abord le groupe WhatsApp pour échanger avec la communauté, signaler les bugs,
-            proposer des améliorations et organiser les défis entre joueurs avant de venir jouer sur le site.
+            Rejoins le groupe pour parler avec les joueurs, signaler un souci et organiser les défis.
           </p>
-          <div className="landing-community-actions">
-            <a
-              className="primary-button"
-              href={WHATSAPP_GROUP_URL}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Rejoindre le WhatsApp
-              <ChevronRight size={16} aria-hidden="true" />
-            </a>
-            <span className="landing-community-note">Présente-toi, pose tes questions, puis crée ton compte.</span>
-          </div>
+          <a
+            className="primary-button landing-community-button"
+            href={WHATSAPP_GROUP_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Rejoindre
+            <ChevronRight size={16} aria-hidden="true" />
+          </a>
         </div>
         <div className="landing-actions">
           <button type="button" className="primary-button" onClick={onEnter}>
@@ -553,8 +553,7 @@ function AuthView({ mode, onModeChange, onSuccess, onBack }) {
     username: '',
     efootballUsername: '',
     email: '',
-    password: '',
-    country: 'Global'
+    password: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -572,8 +571,7 @@ function AuthView({ mode, onModeChange, onSuccess, onBack }) {
             username: form.username,
             efootballUsername: form.efootballUsername,
             email: form.email,
-            password: form.password,
-            country: form.country
+            password: form.password
           };
 
       const data = await api(endpoint, { method: 'POST', body: payload });
@@ -657,17 +655,6 @@ function AuthView({ mode, onModeChange, onSuccess, onBack }) {
             />
           </label>
 
-          {mode === 'register' && (
-            <label>
-              Pays
-              <input
-                value={form.country}
-                onChange={(event) => setForm((current) => ({ ...current, country: event.target.value }))}
-                placeholder="Pays"
-              />
-            </label>
-          )}
-
           {error && <p className="error">{error}</p>}
           <button type="submit" className="primary-button" disabled={loading}>
             {loading ? <Loader2 size={16} className="spin" aria-hidden="true" /> : null}
@@ -710,12 +697,12 @@ function DashboardView({ user, refreshTick, onGoPlay, onGoDeposit, onGoLeaderboa
       <div className="hero-card">
         <div className="hero-copy">
           <p className="eyebrow">Dashboard mobile</p>
-          <h2>Un seul regard. Une seule action.</h2>
-          <p className="muted">Le dashboard reste volontairement court: solde, jouer maintenant et trois raccourcis.</p>
+          <h2>Solde, action, raccourcis.</h2>
+          <p className="muted">Tout ce qui compte tient dans un seul écran, sans surcharge visuelle.</p>
         </div>
         <button type="button" className="primary-button hero-button" onClick={onGoPlay}>
           <Gamepad2 size={18} aria-hidden="true" />
-          JOUER MAINTENANT
+          Jouer maintenant
         </button>
       </div>
 
