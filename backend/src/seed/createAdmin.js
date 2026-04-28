@@ -4,18 +4,18 @@ import { User } from '../models/User.js';
 import { ensureWallet } from '../services/walletService.js';
 
 const ADMIN_CONFIG = {
-  username: process.env.ADMIN_USERNAME || 'admin',
-  email: process.env.ADMIN_EMAIL || 'admin@skill2cash.com',
+  username: process.env.ADMIN_USERNAME,
+  email: process.env.ADMIN_EMAIL,
   password: process.env.ADMIN_PASSWORD,
-  country: process.env.ADMIN_COUNTRY || "Côte d'Ivoire",
+  country: process.env.ADMIN_COUNTRY || "Cote d'Ivoire",
   level: process.env.ADMIN_LEVEL || 'Elite',
   role: 'admin'
 };
 
 export async function createAdmin() {
   try {
-    if (!ADMIN_CONFIG.password) {
-      throw new Error('ADMIN_PASSWORD is required to create the admin account');
+    if (!ADMIN_CONFIG.username || !ADMIN_CONFIG.email || !ADMIN_CONFIG.password) {
+      throw new Error('ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_PASSWORD are required to create the admin account');
     }
 
     await connectDatabase();
@@ -47,7 +47,6 @@ export async function createAdmin() {
 
     console.log('Admin account created successfully.');
     console.log(`Email: ${ADMIN_CONFIG.email}`);
-    console.log(`Password: ${ADMIN_CONFIG.password}`);
     console.log('Change these credentials immediately after first login.');
 
     await disconnectDatabase();

@@ -28,15 +28,16 @@ async function main() {
   }
 
   if (env.mongoUri === 'memory') {
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@skill2cash.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
+    const adminUsername = process.env.ADMIN_USERNAME;
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
     const existingAdmin = await User.findOne({ role: 'admin' });
-    if (!existingAdmin) {
+    if (!existingAdmin && adminUsername && adminEmail && adminPassword) {
       const admin = await User.create({
-        username: process.env.ADMIN_USERNAME || 'admin',
-        efootballUsername: process.env.ADMIN_EFOOTBALL_USERNAME || 'admin',
+        username: adminUsername,
+        efootballUsername: process.env.ADMIN_EFOOTBALL_USERNAME || adminUsername,
         email: adminEmail,
-        country: 'Côte d\'Ivoire',
+        country: "Cote d'Ivoire",
         level: 'Elite',
         role: 'admin',
         passwordHash: await User.hashPassword(adminPassword),
@@ -49,7 +50,9 @@ async function main() {
         avatar: 'https://api.dicebear.com/9.x/bottts/svg?seed=admin'
       });
       await ensureWallet(admin._id);
-      console.log(`Memory admin ready: ${adminEmail} / ${adminPassword}`);
+      console.log(`Memory admin ready: ${adminEmail}`);
+    } else if (!existingAdmin) {
+      console.log('Memory admin not created. Set ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_PASSWORD to enable one.');
     }
   }
 
