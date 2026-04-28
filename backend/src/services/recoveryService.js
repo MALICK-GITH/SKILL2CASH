@@ -1,8 +1,54 @@
 import mongoose from 'mongoose';
+import { Notification } from '../models/Notification.js';
 import { Duel } from '../models/Duel.js';
 import { Wallet } from '../models/Wallet.js';
+import { Withdrawal } from '../models/Withdrawal.js';
 import { User } from '../models/User.js';
 import { logCriticalAction, logError } from './auditLogService.js';
+import { notifyUser } from './notificationService.js';
+
+const STALE_ACTIVE_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+const STALE_REVIEW_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+
+function syncWalletTotal(wallet) {
+  wallet.balanceTotal = wallet.balanceAvailable + wallet.balanceLocked;
+}
+
+async function refundStakedDuel(duel, session) {
+  const wallet1 = await Wallet.findOne({ user: duel.player1 }).session(session);
+  const wallet2 = await Wallet.findOne({ user: duel.player2 }).session(session);
+
+  if (!wallet1 || !wallet2) return false;
+
+  wallet1.balanceLocked = Math.max(wallet1.balanceLocked - duel.amount, 0);
+  wallet1.balanceAvailable += duel.amount;
+  syncWalletTotal(wallet1);
+
+  wallet2.balanceLocked = Math.max(wallet2.balanceLocked - duel.amount, 0);
+  wallet2.balanceAvailable += duel.amount;
+  syncWalletTotal(wallet2);
+
+  await wallet1.save({ session });
+  await wallet2.save({ session });
+
+  return true;
+}
+
+async function markDuelForManualReview(duel, session, reason, recoveryResults) {
+  duel.status = 'dispute';
+  duel.disputeReason = reason;
+  duel.autoValidationStatus = 'manual_review';
+  duel.autoValidationReason = reason;
+  await duel.save({ session });
+
+  recoveryResults.duelsRecovered++;
+  await logCriticalAction('recovery:duel_escalated', duel.player1, {
+    duelId: duel._id,
+    reason,
+    status: duel.status,
+    amount: duel.amount
+  });
+}
 
 /**
  * Service de récupération après crash
@@ -21,31 +67,20 @@ export async function recoverFromCrash() {
       // 1. Récupérer les duels actifs depuis plus de 2 heures (crash potentiel)
       const staleActiveDuels = await Duel.find({
         status: 'active',
-        startedAt: { $lt: new Date(Date.now() - 2 * 60 * 60 * 1000) }
+        startedAt: { $lt: new Date(Date.now() - STALE_ACTIVE_TIMEOUT_MS) }
       }).session(session);
 
       for (const duel of staleActiveDuels) {
         try {
-          // Rembourser les mises bloquées
-          const wallet1 = await Wallet.findOne({ user: duel.player1 }).session(session);
-          const wallet2 = await Wallet.findOne({ user: duel.player2 }).session(session);
-
-          if (wallet1 && wallet2) {
-            wallet1.balanceLocked = Math.max(wallet1.balanceLocked - duel.amount, 0);
-            wallet1.balanceAvailable += duel.amount;
-            wallet2.balanceLocked = Math.max(wallet2.balanceLocked - duel.amount, 0);
-            wallet2.balanceAvailable += duel.amount;
-
-            await wallet1.save({ session });
-            await wallet2.save({ session });
-
+          const refunded = await refundStakedDuel(duel, session);
+          if (refunded) {
             duel.status = 'cancelled';
             duel.disputeReason = 'Auto-cancelled due to crash recovery';
             duel.finishedAt = new Date();
             await duel.save({ session });
 
             recoveryResults.duelsRecovered++;
-            
+
             await logCriticalAction('recovery:duel_cancelled', duel.player1, {
               duelId: duel._id,
               reason: 'Crash recovery',
@@ -61,34 +96,34 @@ export async function recoverFromCrash() {
         }
       }
 
-      // 2. Récupérer les duels en attente de résultat depuis plus de 24h
-      const staleWaitingDuels = await Duel.find({
-        status: 'waiting_result',
-        updatedAt: { $lt: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+      // 2. Récupérer les duels bloqués dans les états de preuve/analyse depuis plus de 24h
+      const staleReviewDuels = await Duel.find({
+        status: { $in: ['waiting_player1_proof', 'waiting_player2_proof', 'analyzing', 'waiting_result', 'under_review'] },
+        updatedAt: { $lt: new Date(Date.now() - STALE_REVIEW_TIMEOUT_MS) }
       }).session(session);
 
-      for (const duel of staleWaitingDuels) {
+      for (const duel of staleReviewDuels) {
         try {
-          // Rembourser les mises bloquées
-          const wallet1 = await Wallet.findOne({ user: duel.player1 }).session(session);
-          const wallet2 = await Wallet.findOne({ user: duel.player2 }).session(session);
+          const hasProofs = Boolean(duel.resultPlayer1 || duel.resultPlayer2);
+          if (hasProofs) {
+            await markDuelForManualReview(
+              duel,
+              session,
+              'Auto-escalated during crash recovery after proof submission',
+              recoveryResults
+            );
+            continue;
+          }
 
-          if (wallet1 && wallet2) {
-            wallet1.balanceLocked = Math.max(wallet1.balanceLocked - duel.amount, 0);
-            wallet1.balanceAvailable += duel.amount;
-            wallet2.balanceLocked = Math.max(wallet2.balanceLocked - duel.amount, 0);
-            wallet2.balanceAvailable += duel.amount;
-
-            await wallet1.save({ session });
-            await wallet2.save({ session });
-
+          const refunded = await refundStakedDuel(duel, session);
+          if (refunded) {
             duel.status = 'cancelled';
             duel.disputeReason = 'Auto-cancelled due to timeout (24h)';
             duel.finishedAt = new Date();
             await duel.save({ session });
 
             recoveryResults.duelsRecovered++;
-            
+
             await logCriticalAction('recovery:duel_timeout', duel.player1, {
               duelId: duel._id,
               reason: '24h timeout',
@@ -108,8 +143,7 @@ export async function recoverFromCrash() {
       const allWallets = await Wallet.find({ deletedAt: null }).session(session);
       for (const wallet of allWallets) {
         const expectedTotal = wallet.balanceAvailable + wallet.balanceLocked;
-        if (Math.abs(wallet.balanceTotal - expectedTotal) > 1) {
-          // Corriger l'incohérence
+        if (wallet.balanceTotal !== expectedTotal) {
           const previousTotal = wallet.balanceTotal;
           wallet.balanceTotal = expectedTotal;
           await wallet.save({ session });
@@ -135,6 +169,67 @@ export async function recoverFromCrash() {
   }
 }
 
+async function notificationExists(userId, type, withdrawalId) {
+  return Boolean(await Notification.exists({
+    user: userId,
+    type,
+    'metadata.withdrawalId': withdrawalId
+  }));
+}
+
+export async function recoverMissingWithdrawalNotifications() {
+  const withdrawals = await Withdrawal.find({ status: { $in: ['approved', 'paid', 'rejected'] } })
+    .sort({ updatedAt: -1 })
+    .limit(200);
+
+  let replayed = 0;
+  const errors = [];
+
+  for (const withdrawal of withdrawals) {
+    try {
+      if (withdrawal.status === 'approved' || withdrawal.status === 'paid') {
+        const approvedMissing = !(await notificationExists(withdrawal.user, 'withdrawal:approved', withdrawal._id));
+        if (approvedMissing) {
+          await notifyUser(withdrawal.user, 'withdrawal:approved', {
+            withdrawalId: withdrawal._id,
+            status: withdrawal.status
+          });
+          replayed += 1;
+        }
+      }
+
+      if (withdrawal.status === 'paid') {
+        const paidMissing = !(await notificationExists(withdrawal.user, 'withdrawal:paid', withdrawal._id));
+        if (paidMissing) {
+          await notifyUser(withdrawal.user, 'withdrawal:paid', {
+            withdrawalId: withdrawal._id,
+            amount: withdrawal.amount
+          });
+          replayed += 1;
+        }
+      }
+
+      if (withdrawal.status === 'rejected') {
+        const rejectedMissing = !(await notificationExists(withdrawal.user, 'withdrawal:rejected', withdrawal._id));
+        if (rejectedMissing) {
+          await notifyUser(withdrawal.user, 'withdrawal:rejected', {
+            withdrawalId: withdrawal._id
+          });
+          replayed += 1;
+        }
+      }
+    } catch (error) {
+      errors.push({ withdrawalId: withdrawal._id, error: error.message });
+      await logError('recovery:withdrawal_notification_failed', withdrawal.user, error.message, {
+        withdrawalId: withdrawal._id,
+        status: withdrawal.status
+      });
+    }
+  }
+
+  return { replayed, errors };
+}
+
 /**
  * Vérifier l'intégrité des données
  */
@@ -150,7 +245,7 @@ export async function checkDataIntegrity() {
   const wallets = await Wallet.find({ deletedAt: null });
   for (const wallet of wallets) {
     const expectedTotal = wallet.balanceAvailable + wallet.balanceLocked;
-    if (Math.abs(wallet.balanceTotal - expectedTotal) > 1) {
+    if (wallet.balanceTotal !== expectedTotal) {
       integrityResults.walletInconsistencies++;
       integrityResults.details.push({
         type: 'wallet_inconsistency',

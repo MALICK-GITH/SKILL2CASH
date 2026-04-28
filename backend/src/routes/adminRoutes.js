@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import mongoose from 'mongoose';
 import { Challenge } from '../models/Challenge.js';
 import { CommissionSetting } from '../models/CommissionSetting.js';
@@ -14,7 +14,7 @@ import { protect, requireAdmin } from '../middleware/auth.js';
 import { requireFields } from '../middleware/validate.js';
 import { cancelDuel, finishDuel } from '../services/duelService.js';
 import { approveManualDeposit, rejectManualDeposit } from '../services/depositService.js';
-import { notifyUser } from '../services/notificationService.js';
+import { notifyAdmins, notifyUser } from '../services/notificationService.js';
 import { adjustBalance } from '../services/walletService.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -26,7 +26,7 @@ adminRouter.use(protect, requireAdmin);
 adminRouter.get('/overview', asyncHandler(async (_req, res) => {
   const [users, activeDuels, disputes, pendingWithdrawals, walletTotals, commissionTotals] = await Promise.all([
     User.countDocuments(),
-    Duel.countDocuments({ status: { $in: ['active', 'waiting_result'] } }),
+    Duel.countDocuments({ status: { $in: ['active', 'waiting_player1_proof', 'waiting_player2_proof', 'analyzing', 'waiting_result', 'under_review'] } }),
     Duel.countDocuments({ status: 'dispute' }),
     Withdrawal.countDocuments({ status: 'pending' }),
     Wallet.aggregate([{ $group: { _id: null, available: { $sum: '$balanceAvailable' }, locked: { $sum: '$balanceLocked' }, total: { $sum: '$balanceTotal' } } }]),
@@ -48,19 +48,19 @@ adminRouter.get('/overview', asyncHandler(async (_req, res) => {
 adminRouter.get('/inbox', asyncHandler(async (_req, res) => {
   const [deposits, withdrawals, disputes, usernameRequests] = await Promise.all([
     Deposit.find({ status: 'pending' })
-      .populate('user', 'username email country reportsCount isBanned')
+      .populate('user', 'username efootballUsername email country reportsCount isBanned')
       .sort({ createdAt: -1 })
       .limit(50),
     Withdrawal.find({ status: 'pending' })
-      .populate('user', 'username email country reportsCount isBanned')
+      .populate('user', 'username efootballUsername email country reportsCount isBanned')
       .sort({ createdAt: -1 })
       .limit(50),
     Duel.find({ status: 'dispute' })
-      .populate('player1 player2', 'username email country reportsCount isBanned')
+      .populate('player1 player2', 'username efootballUsername email country reportsCount isBanned')
       .sort({ updatedAt: -1 })
       .limit(50),
     UsernameChangeRequest.find({ status: 'pending' })
-      .populate('user', 'username email country reportsCount isBanned')
+      .populate('user', 'username efootballUsername email country reportsCount isBanned')
       .sort({ createdAt: -1 })
       .limit(50)
   ]);
@@ -128,7 +128,7 @@ adminRouter.get('/username-change-requests', asyncHandler(async (req, res) => {
   const filter = {};
   if (req.query.status) filter.status = req.query.status;
   const requests = await UsernameChangeRequest.find(filter)
-    .populate('user reviewedBy', 'username email country')
+    .populate('user reviewedBy', 'username efootballUsername email country')
     .sort({ createdAt: -1 })
     .limit(100);
   res.json({ requests });
@@ -213,7 +213,7 @@ adminRouter.get('/deposits', asyncHandler(async (req, res) => {
   }
 
   const deposits = await Deposit.find(filter)
-    .populate('user approvedBy', 'username email country reportsCount isBanned')
+    .populate('user approvedBy', 'username efootballUsername email country reportsCount isBanned')
     .sort({ createdAt: -1 })
     .limit(100);
 
@@ -225,13 +225,41 @@ adminRouter.get('/deposits', asyncHandler(async (req, res) => {
   res.json({ deposits, totals });
 }));
 
+adminRouter.get('/withdrawals', asyncHandler(async (req, res) => {
+  const filter = {};
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.method) filter.method = req.query.method;
+  if (req.query.user && mongoose.Types.ObjectId.isValid(req.query.user)) {
+    filter.user = new mongoose.Types.ObjectId(req.query.user);
+  }
+
+  const withdrawals = await Withdrawal.find(filter)
+    .populate('user', 'username efootballUsername email country reportsCount isBanned')
+    .sort({ createdAt: -1 })
+    .limit(100);
+
+  res.json({ withdrawals });
+}));
+
 adminRouter.post('/deposits/:id/approve', asyncHandler(async (req, res) => {
   const deposit = await approveManualDeposit(req.params.id, req.user._id, req.body.adminNote || '');
+  await notifyAdmins('admin:deposit_reviewed', {
+    depositId: deposit._id,
+    action: 'approved',
+    amount: deposit.amount,
+    method: deposit.method
+  });
   res.json({ deposit });
 }));
 
 adminRouter.post('/deposits/:id/reject', asyncHandler(async (req, res) => {
   const deposit = await rejectManualDeposit(req.params.id, req.user._id, req.body.adminNote || '');
+  await notifyAdmins('admin:deposit_reviewed', {
+    depositId: deposit._id,
+    action: 'rejected',
+    amount: deposit.amount,
+    method: deposit.method
+  });
   res.json({ deposit });
 }));
 
@@ -242,12 +270,12 @@ adminRouter.get('/users', asyncHandler(async (_req, res) => {
 }));
 
 adminRouter.get('/duels', asyncHandler(async (_req, res) => {
-  const duels = await Duel.find().populate('player1 player2 winner loser', 'username email country').sort({ createdAt: -1 }).limit(100);
+  const duels = await Duel.find().populate('player1 player2 winner loser', 'username efootballUsername email country').sort({ createdAt: -1 }).limit(100);
   res.json({ duels });
 }));
 
 adminRouter.get('/disputes', asyncHandler(async (_req, res) => {
-  const disputes = await Duel.find({ status: 'dispute' }).populate('player1 player2 winner loser', 'username email country').sort({ updatedAt: -1 });
+  const disputes = await Duel.find({ status: 'dispute' }).populate('player1 player2 winner loser', 'username efootballUsername email country').sort({ updatedAt: -1 });
   res.json({ disputes });
 }));
 
@@ -256,27 +284,62 @@ adminRouter.post('/disputes/:id/resolve', requireFields(['action']), asyncHandle
   if (action === 'winner') {
     if (!winnerId) throw new AppError('winnerId est requis', 422);
     const duel = await finishDuel(req.params.id, winnerId);
+    await notifyAdmins('admin:dispute_resolved', {
+      duelId: duel._id,
+      action: 'winner',
+      winnerId
+    });
     return res.json({ duel });
   }
   if (action === 'cancel') {
     const duel = await cancelDuel(req.params.id, reason || 'Dispute resolved by refund');
+    await notifyAdmins('admin:dispute_resolved', {
+      duelId: duel._id,
+      action: 'cancel',
+      reason: reason || 'Dispute resolved by refund'
+    });
     return res.json({ duel });
   }
   throw new AppError('Action de résolution inconnue', 422);
 }));
 
 adminRouter.post('/withdrawals/:id/approve', asyncHandler(async (req, res) => {
-  const withdrawal = await Withdrawal.findById(req.params.id);
-  if (!withdrawal) throw new AppError('Retrait non trouvé', 404);
-  if (withdrawal.status !== 'pending') throw new AppError('Retrait déjà traité', 422);
-  withdrawal.status = req.body.markPaid ? 'paid' : 'approved';
-  withdrawal.adminNote = req.body.adminNote || '';
-  await withdrawal.save();
-  await Transaction.updateOne({ referenceId: withdrawal._id, type: 'withdraw' }, { status: withdrawal.status === 'paid' ? 'success' : 'pending' });
-  notifyUser(withdrawal.user, 'withdrawal:approved', { withdrawalId: withdrawal._id, status: withdrawal.status });
-  res.json({ withdrawal });
-}));
+  const session = await mongoose.startSession();
+  try {
+    const withdrawal = await session.withTransaction(async () => {
+      const doc = await Withdrawal.findById(req.params.id).session(session);
+      if (!doc) throw new AppError('Retrait non trouvé', 404);
+      if (doc.status !== 'pending') throw new AppError('Retrait déjà traité', 422);
 
+      doc.status = req.body.markPaid ? 'paid' : 'approved';
+      doc.adminNote = req.body.adminNote || '';
+      await doc.save({ session });
+
+      await Transaction.updateOne(
+        { referenceId: doc._id, type: 'withdraw' },
+        { $set: { status: doc.status === 'paid' ? 'success' : 'pending' } }
+      ).session(session);
+
+      return doc;
+    });
+
+    try {
+      await notifyUser(withdrawal.user, 'withdrawal:approved', { withdrawalId: withdrawal._id, status: withdrawal.status });
+      if (withdrawal.status === 'paid') {
+        await notifyUser(withdrawal.user, 'withdrawal:paid', { withdrawalId: withdrawal._id, amount: withdrawal.amount });
+      }
+      await notifyAdmins('admin:withdrawal_reviewed', {
+        withdrawalId: withdrawal._id,
+        action: withdrawal.status,
+        amount: withdrawal.amount,
+        method: withdrawal.method
+      });
+    } catch {}
+    res.json({ withdrawal });
+  } finally {
+    await session.endSession();
+  }
+}));
 adminRouter.post('/withdrawals/:id/reject', asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
   try {
@@ -288,10 +351,18 @@ adminRouter.post('/withdrawals/:id/reject', asyncHandler(async (req, res) => {
       doc.adminNote = req.body.adminNote || 'Rejected by admin';
       await doc.save({ session });
       await adjustBalance(doc.user, doc.amount, `Remboursement de retrait rejeté: ${doc.adminNote}`, session);
-      await Transaction.updateOne({ referenceId: doc._id, type: 'withdraw' }, { status: 'cancelled' }).session(session);
+      await Transaction.updateOne({ referenceId: doc._id, type: 'withdraw' }, { $set: { status: 'cancelled' } }).session(session);
       return doc;
     });
-    notifyUser(withdrawal.user, 'withdrawal:rejected', { withdrawalId: withdrawal._id });
+    try {
+      await notifyUser(withdrawal.user, 'withdrawal:rejected', { withdrawalId: withdrawal._id });
+      await notifyAdmins('admin:withdrawal_reviewed', {
+        withdrawalId: withdrawal._id,
+        action: 'rejected',
+        amount: withdrawal.amount,
+        method: withdrawal.method
+      });
+    } catch {}
     res.json({ withdrawal });
   } finally {
     await session.endSession();
@@ -354,3 +425,4 @@ adminRouter.get('/challenges', asyncHandler(async (_req, res) => {
   const challenges = await Challenge.find().populate('challenger challenged', 'username email country').sort({ createdAt: -1 }).limit(100);
   res.json({ challenges });
 }));
+

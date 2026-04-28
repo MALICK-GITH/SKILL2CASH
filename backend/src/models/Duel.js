@@ -23,7 +23,17 @@ const duelSchema = new mongoose.Schema(
     winnerAmount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ['active', 'waiting_result', 'under_review', 'dispute', 'finished', 'cancelled'],
+      enum: [
+        'active',
+        'waiting_player1_proof',
+        'waiting_player2_proof',
+        'analyzing',
+        'finished',
+        'dispute',
+        'waiting_result',
+        'under_review',
+        'cancelled'
+      ],
       default: 'active'
     },
     rules: { type: String, default: '' },

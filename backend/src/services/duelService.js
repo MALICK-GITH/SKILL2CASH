@@ -4,7 +4,7 @@ import { Duel } from '../models/Duel.js';
 import { User } from '../models/User.js';
 import { AppError } from '../utils/AppError.js';
 import { calculateCommission, getCommissionRate } from './commissionService.js';
-import { notifyRoom, notifyUser } from './notificationService.js';
+import { notifyAdmins, notifyRoom, notifyUser } from './notificationService.js';
 import { analyzeMatchScreenshot, shouldAutoApproveWithOcr } from './ocrService.js';
 import { badgeForUser, rankForUser } from './rankService.js';
 import { lockStake, refundStake, settleDuelWallets } from './walletService.js';
@@ -24,11 +24,22 @@ export async function acceptChallenge(challengeId, userId) {
         throw new AppError('Défi expiré', 422);
       }
 
-      await lockStake(challenge.challenger, challenge.amount, challenge._id, session);
-      await lockStake(challenge.challenged, challenge.amount, challenge._id, session);
+      const acceptedAmount = challenge.status === 'counter_offer' && Number.isFinite(Number(challenge.counterAmount))
+        ? Number(challenge.counterAmount)
+        : Number(challenge.amount);
+      if (!Number.isFinite(acceptedAmount) || acceptedAmount <= 0) {
+        throw new AppError('Le montant du défi est invalide', 422);
+      }
 
-      const potTotal = challenge.amount * 2;
-      const commissionRate = await getCommissionRate(challenge.amount);
+      challenge.amount = acceptedAmount;
+
+      await lockStake(challenge.challenger, acceptedAmount, challenge._id, session);
+      await lockStake(challenge.challenged, acceptedAmount, challenge._id, session);
+      await notifyUser(challenge.challenger, 'duel:stake_locked', { duelId: challenge._id, amount: acceptedAmount });
+      await notifyUser(challenge.challenged, 'duel:stake_locked', { duelId: challenge._id, amount: acceptedAmount });
+
+      const potTotal = acceptedAmount * 2;
+      const commissionRate = await getCommissionRate(acceptedAmount);
       const { commissionAmount, winnerAmount } = calculateCommission(potTotal, commissionRate);
       const roomId = `s2c-${challenge._id.toString().slice(-8)}-${Date.now().toString(36)}`;
 
@@ -38,7 +49,7 @@ export async function acceptChallenge(challengeId, userId) {
             challenge: challenge._id,
             player1: challenge.challenger,
             player2: challenge.challenged,
-            amount: challenge.amount,
+            amount: acceptedAmount,
             potTotal,
             commissionRate,
             commissionAmount,
@@ -57,11 +68,18 @@ export async function acceptChallenge(challengeId, userId) {
       await logCriticalAction('duel:challenge_accepted', userId, { 
         challengeId: challenge._id, 
         duelId: duel._id, 
-        amount: challenge.amount 
+        amount: acceptedAmount 
       });
       
-      notifyUser(challenge.challenger, 'challenge:accepted', { challengeId: challenge._id, duelId: duel._id });
-      notifyUser(challenge.challenged, 'duel:active', { duelId: duel._id, roomId });
+      await notifyUser(challenge.challenger, 'challenge:accepted', { challengeId: challenge._id, duelId: duel._id });
+      await notifyUser(challenge.challenger, 'duel:room_created', { duelId: duel._id, roomId, link: `/duels/${duel._id}` });
+      await notifyUser(challenge.challenged, 'duel:room_created', { duelId: duel._id, roomId, link: `/duels/${duel._id}` });
+      await notifyAdmins('admin:duel_room_created', {
+        duelId: duel._id,
+        challengeId: challenge._id,
+        amount: challenge.amount,
+        roomId
+      });
       return duel;
     });
   } catch (error) {
@@ -100,7 +118,9 @@ export async function submitResult(duelId, userId, result) {
     return await session.withTransaction(async () => {
       const duel = await Duel.findById(duelId).session(session);
       if (!duel) throw new AppError('Duel not found', 404);
-      if (!['active', 'waiting_result', 'dispute'].includes(duel.status)) throw new AppError('Duel fermé', 422);
+      if (!['active', 'waiting_player1_proof', 'waiting_player2_proof', 'analyzing', 'waiting_result', 'under_review', 'dispute'].includes(duel.status)) {
+        throw new AppError('Duel fermé', 422);
+      }
 
       const isPlayer1 = String(duel.player1) === String(userId);
       const isPlayer2 = String(duel.player2) === String(userId);
@@ -113,9 +133,13 @@ export async function submitResult(duelId, userId, result) {
         comment: result.comment || ''
       };
 
+      if ((isPlayer1 && duel.resultPlayer1) || (isPlayer2 && duel.resultPlayer2)) {
+        throw new AppError('Votre preuve a déjà été soumise', 422);
+      }
+
       const [player1, player2] = await Promise.all([
-        User.findById(duel.player1).select('username').session(session),
-        User.findById(duel.player2).select('username').session(session)
+        User.findById(duel.player1).select('username efootballUsername').session(session),
+        User.findById(duel.player2).select('username efootballUsername').session(session)
       ]);
       const ocr = await analyzeMatchScreenshot(payload.screenshot, [player1, player2]);
 
@@ -135,11 +159,28 @@ export async function submitResult(duelId, userId, result) {
         duel.ocrPlayersDetectedPlayer2 = ocr.playersDetected;
         duel.ocrConfidencePlayer2 = ocr.confidence;
       }
-      duel.status = 'waiting_result';
+      duel.status = duel.resultPlayer1 && duel.resultPlayer2
+        ? 'analyzing'
+        : isPlayer1
+          ? 'waiting_player2_proof'
+          : 'waiting_player1_proof';
       duel.autoValidationStatus = ocr.status === 'failed' ? 'failed' : 'pending';
       duel.autoValidationReason = ocr.error || '';
 
+      if (duel.resultPlayer1 && !duel.resultPlayer2) {
+        await notifyUser(duel.player1, 'duel:proof_submitted', { duelId: duel._id, roomId: duel.roomId });
+        await notifyUser(duel.player2, 'duel:proof_received', { duelId: duel._id, roomId: duel.roomId });
+        await notifyUser(duel.player1, 'duel:result_pending', { duelId: duel._id, roomId: duel.roomId });
+      }
+      if (duel.resultPlayer2 && !duel.resultPlayer1) {
+        await notifyUser(duel.player2, 'duel:proof_submitted', { duelId: duel._id, roomId: duel.roomId });
+        await notifyUser(duel.player1, 'duel:proof_received', { duelId: duel._id, roomId: duel.roomId });
+        await notifyUser(duel.player2, 'duel:result_pending', { duelId: duel._id, roomId: duel.roomId });
+      }
+
       if (duel.resultPlayer1 && duel.resultPlayer2) {
+        await notifyUser(duel.player1, 'duel:analysis_started', { duelId: duel._id, roomId: duel.roomId });
+        await notifyUser(duel.player2, 'duel:analysis_started', { duelId: duel._id, roomId: duel.roomId });
         const validation = shouldAutoApproveWithOcr({ duel, player1, player2 });
         if (validation.approved) {
           duel.autoValidationStatus = 'auto_approved';
@@ -154,11 +195,16 @@ export async function submitResult(duelId, userId, result) {
         duel.autoValidationStatus = ocr.status === 'failed' || anyOcrFailed ? 'failed' : 'manual_review';
         duel.autoValidationReason = validation.reason;
         duel.disputeReason = validation.reason;
+        await notifyAdmins('admin:dispute_pending', {
+          duelId: duel._id,
+          roomId: duel.roomId,
+          reason: validation.reason
+        });
       }
 
       await duel.save({ session });
-      notifyRoom(duel.roomId, 'duel:result_submitted', { duelId: duel._id, status: duel.status });
-      if (duel.status === 'dispute') notifyRoom(duel.roomId, 'duel:dispute_opened', { duelId: duel._id });
+      await notifyRoom(duel.roomId, 'duel:result_submitted', { duelId: duel._id, status: duel.status });
+      if (duel.status === 'dispute') await notifyRoom(duel.roomId, 'duel:dispute_opened', { duelId: duel._id });
       return duel;
     });
   } finally {
@@ -217,7 +263,11 @@ export async function finishDuel(duelId, winnerId, session = null) {
       duel.status = 'finished';
       duel.finishedAt = new Date();
       await duel.save({ session: useSession });
-      notifyRoom(duel.roomId, 'duel:finished', { duelId: duel._id, winnerId: winner });
+      await notifyUser(winner, 'duel:payment_released', { duelId: duel._id, amount: duel.winnerAmount });
+      await notifyRoom(duel.roomId, 'duel:finished', { duelId: duel._id, winnerId: winner });
+      const winnerLabel = winnerUser?.efootballUsername || winnerUser?.username || '';
+      await notifyUser(winner, 'duel:finished', { duelId: duel._id, winnerId: winner, winnerUsername: winnerLabel });
+      await notifyUser(loser, 'duel:finished', { duelId: duel._id, winnerId: winner, winnerUsername: winnerLabel });
       return duel;
     };
 

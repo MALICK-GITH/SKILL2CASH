@@ -90,7 +90,7 @@ export async function analyzeMatchScreenshot(screenshot, players) {
       ...(digitsResult.scoreCandidates || [])
     ]));
     const score = combinedScoreCandidates[0] || extractScoreCandidates(combinedText)[0] || '';
-    const playersDetected = detectNamesFromText(combinedText, players.map((player) => player.username));
+    const playersDetected = detectNamesFromText(combinedText, players.map((player) => player.efootballUsername || player.username));
     const confidence = Math.max(bestGeneral.confidence, digitsResult.confidence);
     const probableWinner = probableWinnerFromScore(score, players);
 
@@ -131,7 +131,7 @@ export function shouldAutoApproveWithOcr({ duel, player1, player2 }) {
   const ocrScoresMatch = normalizeScore(duel.ocrScorePlayer1) === declaredScore && normalizeScore(duel.ocrScorePlayer2) === declaredScore;
   if (!ocrScoresMatch) return { approved: false, reason: 'OCR score does not match declared score' };
 
-  const playerNames = [player1.username, player2.username];
+  const playerNames = [player1.efootballUsername || player1.username, player2.efootballUsername || player2.username];
   const bothScreenshotsContainPlayers = [duel.ocrPlayersDetectedPlayer1, duel.ocrPlayersDetectedPlayer2].every((detected) =>
     playerNames.every((name) => detected.includes(name))
   );

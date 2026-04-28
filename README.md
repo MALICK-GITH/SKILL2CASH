@@ -10,13 +10,13 @@ SKILL2CASH is a V1 full-stack platform for eFootball 1v1 money duels.
 - Public player profiles, player search, ranks, badges, win rate, earnings, and availability.
 - The SKILL2CASH username is the exact eFootball username. It is locked after registration and can only be changed through admin approval.
 - Internal wallet with available, locked, deposited, withdrawn, won, and lost balances.
-- Simulated deposits and manual withdrawal requests.
+- Manual deposits with screenshot proof, OCR-assisted validation, and manual withdrawal requests.
 - Challenge flow with accept, decline, counter offer, cancel, and expiration fields.
 - Automatic stake locking when a challenge is accepted.
 - Duel rooms with Socket.io notifications and private chat.
 - Result submission with screenshot URL, automatic settlement when both players agree, and disputes when they do not.
 - OCR-assisted match validation with Tesseract.js. Automatic settlement now requires matching player declarations and OCR confirmation with at least 85% confidence.
-- Dynamic commission settings: small 10%, medium 8%, high 5%, tournament default 12%.
+- Dynamic commission settings: small 9%, medium 8%, high 5%, tournament default 12%.
 - Admin dashboard endpoints for users, wallets, duels, disputes, withdrawals, balance adjustments, bans, and commission settings.
 - Cyberpunk dark React UI for player and admin flows.
 
@@ -36,7 +36,6 @@ by SOLITAIRE HACK
 
 ```bash
 npm run install:all
-npm install
 ```
 
 3. Create environment files:
@@ -72,7 +71,10 @@ Or start with your persistent MongoDB/Atlas URI:
 npm run dev:mongo
 ```
 
-Backend: `http://localhost:5000`
+Backend:
+
+- `http://localhost:5001` with `npm run dev`
+- `http://localhost:5000` with `npm run dev:mongo`
 
 Frontend: `http://localhost:5173`
 

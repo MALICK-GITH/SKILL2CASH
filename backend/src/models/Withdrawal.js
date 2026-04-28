@@ -7,7 +7,7 @@ const withdrawalSchema = new mongoose.Schema(
     feeRate: { type: Number, default: 0.03 },
     feeAmount: { type: Number, required: true },
     netAmount: { type: Number, required: true },
-    method: { type: String, enum: ['Mobile Money', 'Crypto', 'Bank', 'Manual'], required: true },
+    method: { type: String, enum: ['wave', 'mtn', 'Mobile Money', 'Crypto', 'Bank', 'Manual'], required: true },
     phoneOrWallet: { type: String, required: true },
     status: { type: String, enum: ['pending', 'approved', 'rejected', 'paid'], default: 'pending' },
     adminNote: { type: String, default: '' }
