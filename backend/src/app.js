@@ -12,6 +12,7 @@ import { authRouter } from './routes/authRoutes.js';
 import { challengeRouter } from './routes/challengeRoutes.js';
 import { duelRouter } from './routes/duelRoutes.js';
 import { leaderboardRouter } from './routes/leaderboardRoutes.js';
+import { notificationRouter } from './routes/notificationRoutes.js';
 import { userRouter } from './routes/userRoutes.js';
 import { walletRouter } from './routes/walletRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
@@ -69,6 +70,7 @@ export function createApp() {
   app.use('/api/challenges', challengeRouter);
   app.use('/api/duels', duelRouter);
   app.use('/api/leaderboard', leaderboardRouter);
+  app.use('/api/notifications', notificationRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/assistant', assistantRouter);
 

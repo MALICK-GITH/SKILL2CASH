@@ -4,7 +4,7 @@ import { Deposit } from '../models/Deposit.js';
 import { Transaction } from '../models/Transaction.js';
 import { User } from '../models/User.js';
 import { AppError } from '../utils/AppError.js';
-import { notifyUser } from './notificationService.js';
+import { notifyAdmins, notifyUser } from './notificationService.js';
 import { analyzeDepositProof } from './depositProofService.js';
 import { ensureWallet } from './walletService.js';
 
@@ -64,7 +64,7 @@ export async function createManualDeposit(userId, payload) {
     transactionReference
   });
 
-  return Deposit.create({
+  const deposit = await Deposit.create({
     user: userId,
     method,
     amount,
@@ -82,50 +82,85 @@ export async function createManualDeposit(userId, payload) {
     ocrDetectedReference: proofAnalysis.detectedReference,
     ocrAmountCandidates: proofAnalysis.amountCandidates
   });
+
+  try {
+    await notifyUser(userId, 'deposit:submitted', {
+      depositId: deposit._id,
+      amount,
+      method,
+      status: deposit.autoVerificationStatus
+    });
+    if (deposit.autoVerificationStatus === 'matched') {
+      await notifyUser(userId, 'deposit:ocr_matched', {
+        depositId: deposit._id,
+        amount,
+        method
+      });
+    } else if (deposit.autoVerificationStatus !== 'failed') {
+      await notifyUser(userId, 'deposit:ocr_review_required', {
+        depositId: deposit._id,
+        amount,
+        method,
+        reason: deposit.autoVerificationReason
+      });
+    }
+    await notifyAdmins('admin:deposit_pending', {
+      depositId: deposit._id,
+      amount,
+      method,
+      autoVerificationStatus: deposit.autoVerificationStatus,
+      userId
+    });
+  } catch {}
+
+  return deposit;
 }
 
 export async function approveManualDeposit(depositId, adminId, adminNote = '') {
   const session = await mongoose.startSession();
   try {
-    return await session.withTransaction(async () => {
-      const deposit = await Deposit.findById(depositId).session(session);
-      if (!deposit) throw new AppError('Dépôt non trouvé', 404);
-      if (deposit.status !== 'pending') throw new AppError('Dépôt déjà traité', 422);
+    const approvedDeposit = await session.withTransaction(async () => {
+      const doc = await Deposit.findById(depositId).session(session);
+      if (!doc) throw new AppError('Dépôt non trouvé', 404);
+      if (doc.status !== 'pending') throw new AppError('Dépôt déjà traité', 422);
 
-      const wallet = await ensureWallet(deposit.user, session);
-      wallet.balanceAvailable += deposit.amount;
-      wallet.balanceTotal += deposit.amount;
-      wallet.totalDeposited += deposit.amount;
+      const wallet = await ensureWallet(doc.user, session);
+      wallet.balanceAvailable += doc.amount;
+      wallet.balanceTotal = wallet.balanceAvailable + wallet.balanceLocked;
+      wallet.totalDeposited += doc.amount;
       await wallet.save({ session });
 
-      deposit.status = 'approved';
-      deposit.adminNote = adminNote;
-      deposit.approvedAt = new Date();
-      deposit.approvedBy = adminId;
-      await deposit.save({ session });
+      doc.status = 'approved';
+      doc.adminNote = adminNote;
+      doc.approvedAt = new Date();
+      doc.approvedBy = adminId;
+      await doc.save({ session });
 
       await Transaction.create([{
-        user: deposit.user,
+        user: doc.user,
         type: 'deposit',
-        amount: deposit.amount,
+        amount: doc.amount,
         status: 'success',
-        referenceId: deposit._id,
-        description: `Dépôt manuel ${deposit.method.toUpperCase()} approuvé`,
-        metadata: { senderPhone: deposit.senderPhone, transactionReference: deposit.transactionReference }
+        referenceId: doc._id,
+        description: `Dépôt manuel ${doc.method.toUpperCase()} approuvé`,
+        metadata: { senderPhone: doc.senderPhone, transactionReference: doc.transactionReference }
       }], { session });
 
       await AdminLog.create([{
         admin: adminId,
         action: 'deposit_approved',
         targetType: 'Deposit',
-        targetId: deposit._id,
+        targetId: doc._id,
         note: adminNote,
-        metadata: { amount: deposit.amount, method: deposit.method }
+        metadata: { amount: doc.amount, method: doc.method }
       }], { session });
 
-      notifyUser(deposit.user, 'deposit:approved', { depositId: deposit._id, amount: deposit.amount });
-      return deposit;
+      return doc;
     });
+    try {
+      await notifyUser(approvedDeposit.user, 'deposit:approved', { depositId: approvedDeposit._id, amount: approvedDeposit.amount });
+    } catch {}
+    return approvedDeposit;
   } finally {
     await session.endSession();
   }
@@ -134,38 +169,67 @@ export async function approveManualDeposit(depositId, adminId, adminNote = '') {
 export async function rejectManualDeposit(depositId, adminId, adminNote = '') {
   const session = await mongoose.startSession();
   try {
-    return await session.withTransaction(async () => {
-      const deposit = await Deposit.findById(depositId).session(session);
-      if (!deposit) throw new AppError('Dépôt non trouvé', 404);
-      if (deposit.status !== 'pending') throw new AppError('Dépôt déjà traité', 422);
+    const rejectedDeposit = await session.withTransaction(async () => {
+      const doc = await Deposit.findById(depositId).session(session);
+      if (!doc) throw new AppError('Dépôt non trouvé', 404);
+      if (doc.status !== 'pending') throw new AppError('Dépôt déjà traité', 422);
 
-      deposit.status = 'rejected';
-      deposit.adminNote = adminNote || 'Payment proof rejected';
-      await deposit.save({ session });
+      doc.status = 'rejected';
+      doc.adminNote = adminNote || 'Payment proof rejected';
+      await doc.save({ session });
 
       const rejectedCount = await Deposit.countDocuments({
-        user: deposit.user,
+        user: doc.user,
         status: 'rejected',
         createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
       }).session(session);
 
       if (rejectedCount >= 3) {
-        await User.updateOne({ _id: deposit.user }, { $inc: { reportsCount: 1 } }).session(session);
+        await User.updateOne({ _id: doc.user }, { $inc: { reportsCount: 1 } }).session(session);
       }
 
       await AdminLog.create([{
         admin: adminId,
         action: 'deposit_rejected',
         targetType: 'Deposit',
-        targetId: deposit._id,
-        note: deposit.adminNote,
-        metadata: { amount: deposit.amount, method: deposit.method, rejectedCount }
+        targetId: doc._id,
+        note: doc.adminNote,
+        metadata: { amount: doc.amount, method: doc.method, rejectedCount }
       }], { session });
 
-      notifyUser(deposit.user, 'deposit:rejected', { depositId: deposit._id, note: deposit.adminNote });
-      return deposit;
+      return doc;
     });
+    try {
+      await notifyUser(rejectedDeposit.user, 'deposit:rejected', { depositId: rejectedDeposit._id, note: rejectedDeposit.adminNote });
+    } catch {}
+    return rejectedDeposit;
   } finally {
     await session.endSession();
   }
+}
+
+export async function autoApproveEligibleDeposits() {
+  const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+  const deposits = await Deposit.find({
+    status: 'pending',
+    autoVerificationStatus: 'matched',
+    createdAt: { $lte: cutoff }
+  }).sort({ createdAt: 1 }).limit(10);
+
+  if (!deposits.length) return { processed: 0 };
+
+  const admin = await User.findOne({ role: 'admin' }).sort({ createdAt: 1 });
+  if (!admin) return { processed: 0 };
+
+  let processed = 0;
+  for (const deposit of deposits) {
+    try {
+      await approveManualDeposit(deposit._id, admin._id, 'Auto-validation OCR après 5 minutes');
+      processed += 1;
+    } catch {
+      // Ignore races with manual admin actions.
+    }
+  }
+
+  return { processed };
 }

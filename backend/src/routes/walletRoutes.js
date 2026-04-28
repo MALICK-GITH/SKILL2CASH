@@ -6,7 +6,7 @@ import { Withdrawal } from '../models/Withdrawal.js';
 import { protect } from '../middleware/auth.js';
 import { requireFields } from '../middleware/validate.js';
 import { createManualDeposit } from '../services/depositService.js';
-import { ensureWallet, requestWithdrawal } from '../services/walletService.js';
+import { ensureWallet, requestWithdrawal, sendWithdrawalRequestNotifications } from '../services/walletService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { getPagination } from '../utils/pagination.js';
 
@@ -43,6 +43,7 @@ walletRouter.post('/withdraw', requireFields(['amount', 'method', 'phoneOrWallet
     method: req.body.method,
     phoneOrWallet: req.body.phoneOrWallet
   });
+  await sendWithdrawalRequestNotifications(withdrawal);
   res.status(201).json({ withdrawal });
 }));
 
