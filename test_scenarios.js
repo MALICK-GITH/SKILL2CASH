@@ -1,7 +1,8 @@
 // Test Script for SKILL2CASH Complete Scenarios
 // This script tests the complete wallet and duel flows
 
-const API_URL = 'http://localhost:5000/api';
+const API_PORT = process.env.PORT || '5001';
+const API_URL = process.env.API_URL || `http://localhost:${API_PORT}/api`;
 
 // Player credentials
 const PLAYER1 = {
@@ -19,8 +20,8 @@ const PLAYER2 = {
 };
 
 const ADMIN = {
-  email: 'admin@skill2cash.test',
-  password: 'password123'
+  email: process.env.ADMIN_EMAIL || 'admin@skill2cash.com',
+  password: process.env.ADMIN_PASSWORD || 'ChangeMeNow123!'
 };
 
 let player1Token = '';
@@ -51,6 +52,31 @@ async function apiCall(endpoint, options = {}) {
     throw new Error(data.message || data.details || 'API Error');
   }
   return data;
+}
+
+async function resolveDisputeAsWinner(duelIdToResolve, winnerIdToUse) {
+  const response = await fetch(`${API_URL}/admin/disputes/${duelIdToResolve}/resolve`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${adminToken}`
+    },
+    body: JSON.stringify({
+      action: 'winner',
+      winnerId: winnerIdToUse
+    })
+  });
+
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 // Step 1: Register and login players
@@ -312,7 +338,38 @@ async function submitResults() {
 // Step 14: Check final wallets after duel
 async function checkFinalWallets() {
   console.log('\n💰 Step 14: Check final wallets after duel...');
-  
+  const duelDetails = await apiCall(`/duels/${duelId}`, {
+    headers: { Authorization: `Bearer ${player1Token}` }
+  });
+
+  if (duelDetails.duel.status === 'dispute') {
+    console.log('ℹ️ Duel entered dispute because the OCR evidence was not strong enough.');
+    await resolveDisputeAsWinner(duelId, player1Id);
+    console.log('✅ Admin resolved the duel dispute in favor of Player1');
+
+    const w1 = await apiCall('/wallet', {
+      headers: { Authorization: `Bearer ${player1Token}` }
+    });
+    const w2 = await apiCall('/wallet', {
+      headers: { Authorization: `Bearer ${player2Token}` }
+    });
+
+    if (w1.wallet.balanceLocked !== 0 || w2.wallet.balanceLocked !== 0) {
+      throw new Error(`❌ CRITICAL BUG: Locked balance should be 0 after dispute resolution. P1=${w1.wallet.balanceLocked}, P2=${w2.wallet.balanceLocked}`);
+    }
+
+    if (w1.wallet.balanceAvailable !== 14200 || w2.wallet.balanceAvailable !== 5000) {
+      throw new Error(`❌ CRITICAL BUG: Available balance after dispute resolution is wrong. P1=${w1.wallet.balanceAvailable}, P2=${w2.wallet.balanceAvailable}`);
+    }
+
+    console.log('✅ Money correctly settled after dispute resolution');
+    return;
+  }
+
+  if (duelDetails.duel.status !== 'finished') {
+    throw new Error(`❌ Duel should be finished or disputed before wallet verification, got ${duelDetails.duel.status}`);
+  }
+
   const w1 = await apiCall('/wallet', {
     headers: { Authorization: `Bearer ${player1Token}` }
   });
@@ -475,7 +532,7 @@ async function testFraudScenarios() {
     });
     throw new Error('❌ CRITICAL BUG: Should not allow challenge with insufficient funds');
   } catch (error) {
-    if (error.message.includes('insufficient') || error.message.includes('balance')) {
+    if (/insufficient|balance|solde/i.test(error.message)) {
       console.log('✅ Correctly blocked challenge with insufficient funds');
     } else {
       throw error;
@@ -495,7 +552,7 @@ async function testFraudScenarios() {
     });
     throw new Error('❌ CRITICAL BUG: Should not allow self-challenge');
   } catch (error) {
-    if (error.message.includes('self') || error.message.includes('same')) {
+    if (/self|same|vous ne pouvez pas vous défier|vous-même/i.test(error.message)) {
       console.log('✅ Correctly blocked self-challenge');
     } else {
       throw error;
