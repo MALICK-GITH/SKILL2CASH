@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateCommission } from '../src/services/commissionService.js';
 import { shouldAutoApproveWithOcr } from '../src/services/ocrService.js';
+import { OPEN_CHALLENGE_STATUSES, openChallengeFilter } from '../src/routes/challengeRoutes.js';
 import { badgeForUser, rankForUser } from '../src/services/rankService.js';
 import { buildTrustProfile, calculateTrustScore } from '../src/services/trustService.js';
 import { validateEfootballUsername } from '../src/utils/username.js';
@@ -65,6 +66,18 @@ test('OCR auto approval requires matching declarations and high confidence', () 
 test('eFootball username is validated as the official SKILL2CASH username', () => {
   assert.equal(validateEfootballUsername('NeymarJr'), 'NeymarJr');
   assert.throws(() => validateEfootballUsername('bad name with spaces'));
+});
+
+test('incoming and outgoing challenge lists only expose open statuses', () => {
+  assert.deepEqual(OPEN_CHALLENGE_STATUSES, ['pending', 'counter_offer']);
+  assert.deepEqual(openChallengeFilter('user-1', 'challenged'), {
+    challenged: 'user-1',
+    status: { $in: ['pending', 'counter_offer'] }
+  });
+  assert.deepEqual(openChallengeFilter('user-2', 'challenger'), {
+    challenger: 'user-2',
+    status: { $in: ['pending', 'counter_offer'] }
+  });
 });
 
 test('trust score rewards reliable and consistent players', () => {

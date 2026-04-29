@@ -10,10 +10,18 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 export const challengeRouter = express.Router();
+export const OPEN_CHALLENGE_STATUSES = ['pending', 'counter_offer'];
+
+export function openChallengeFilter(userId, role) {
+  return {
+    [role]: userId,
+    status: { $in: OPEN_CHALLENGE_STATUSES }
+  };
+}
 
 function requireOpenChallenge(challenge) {
   if (!challenge) throw new AppError('Défi non trouvé', 404);
-  if (!['pending', 'counter_offer'].includes(challenge.status)) {
+  if (!OPEN_CHALLENGE_STATUSES.includes(challenge.status)) {
     throw new AppError('Ce défi n\'est plus modifiable', 422);
   }
   if (challenge.expiresAt < new Date()) {
@@ -93,12 +101,16 @@ challengeRouter.post('/', requireFields(['challengedId', 'amount']), asyncHandle
 }));
 
 challengeRouter.get('/incoming', asyncHandler(async (req, res) => {
-  const challenges = await Challenge.find({ challenged: req.user._id }).populate('challenger', 'username efootballUsername avatar country rank').sort({ createdAt: -1 });
+  const challenges = await Challenge.find(openChallengeFilter(req.user._id, 'challenged'))
+    .populate('challenger', 'username efootballUsername avatar country rank')
+    .sort({ createdAt: -1 });
   res.json({ challenges });
 }));
 
 challengeRouter.get('/outgoing', asyncHandler(async (req, res) => {
-  const challenges = await Challenge.find({ challenger: req.user._id }).populate('challenged', 'username efootballUsername avatar country rank').sort({ createdAt: -1 });
+  const challenges = await Challenge.find(openChallengeFilter(req.user._id, 'challenger'))
+    .populate('challenged', 'username efootballUsername avatar country rank')
+    .sort({ createdAt: -1 });
   res.json({ challenges });
 }));
 
