@@ -234,3 +234,62 @@ export async function adjustBalance(userId, amount, description, session) {
   await createTransaction({ user: userId, type: 'admin_adjustment', amount: numericAmount, description }, session);
   return wallet;
 }
+
+export async function getWalletByUser(userId) {
+  return await ensureWallet(userId);
+}
+
+export async function lockFunds(userId, amount, session = null) {
+  return await lockStake(userId, amount, null, session);
+}
+
+export async function unlockFunds(userId, amount, session = null) {
+  const wallet = await ensureWallet(userId, session);
+  wallet.balanceLocked = Math.max(wallet.balanceLocked - amount, 0);
+  wallet.balanceAvailable += amount;
+  wallet.balanceTotal = wallet.balanceAvailable + wallet.balanceLocked;
+  await wallet.save({ session });
+
+  await createTransaction(
+    { user: userId, type: 'challenge_refund', amount, referenceId: null, description: 'Fonds déblocqués' },
+    session
+  );
+}
+
+export async function creditWallet(userId, amount, type, referenceId, description, session = null) {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new AppError('Le montant doit être positif', 422);
+  }
+
+  const wallet = await ensureWallet(userId, session);
+  wallet.balanceAvailable += numericAmount;
+  wallet.balanceTotal = wallet.balanceAvailable + wallet.balanceLocked;
+  await wallet.save({ session });
+
+  await createTransaction(
+    { user: userId, type, amount: numericAmount, referenceId, description },
+    session
+  );
+}
+
+export async function debitWallet(userId, amount, type, referenceId, description, session = null) {
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new AppError('Le montant doit être positif', 422);
+  }
+
+  const wallet = await ensureWallet(userId, session);
+  if (wallet.balanceAvailable < numericAmount) {
+    throw new AppError('Solde disponible insuffisant', 422);
+  }
+
+  wallet.balanceAvailable -= numericAmount;
+  wallet.balanceTotal = wallet.balanceAvailable + wallet.balanceLocked;
+  await wallet.save({ session });
+
+  await createTransaction(
+    { user: userId, type, amount: numericAmount, referenceId, description },
+    session
+  );
+}

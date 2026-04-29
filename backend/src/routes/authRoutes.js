@@ -20,9 +20,9 @@ function serializeUser(user) {
 
 authRouter.post(
   '/register',
-  requireFields(['email', 'password']),
+  requireFields(['username', 'efootballUsername', 'firstName', 'lastName', 'phone', 'email', 'password']),
   asyncHandler(async (req, res) => {
-    const { email, password, country = 'Global' } = req.body;
+    const { email, password, firstName, lastName, phone, country = 'Global' } = req.body;
     const username = validateEfootballUsername(req.body.username || req.body.skill2cashUsername);
     const efootballUsername = validateEfootballUsername(req.body.efootballUsername || req.body.username);
     if (!validator.isEmail(email)) throw new AppError('Email invalide', 422);
@@ -31,6 +31,7 @@ authRouter.post(
     const exists = await User.findOne({
       $or: [
         { email: email.toLowerCase() },
+        { phone: String(phone).trim() },
         { username: usernameRegex(username) },
         { efootballUsername: usernameRegex(efootballUsername) }
       ]
@@ -40,7 +41,10 @@ authRouter.post(
     const user = await User.create({
       username,
       efootballUsername,
+      firstName: String(firstName).trim(),
+      lastName: String(lastName).trim(),
       email,
+      phone: String(phone).trim(),
       country,
       passwordHash: await User.hashPassword(password)
     });

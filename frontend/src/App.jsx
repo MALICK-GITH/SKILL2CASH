@@ -147,6 +147,7 @@ function App() {
   const [socket, setSocket] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedDuelId, setSelectedDuelId] = useState(null);
+  const [roomFocus, setRoomFocus] = useState('');
   const [profileTarget, setProfileTarget] = useState(null);
   const [challengeTarget, setChallengeTarget] = useState(null);
 
@@ -154,12 +155,16 @@ function App() {
 
   function navigate(nextView) {
     setView(nextView);
-    if (nextView !== 'room') setSelectedDuelId(null);
+    if (nextView !== 'room') {
+      setSelectedDuelId(null);
+      setRoomFocus('');
+    }
     if (nextView !== 'profile') setProfileTarget(null);
   }
 
-  function openRoom(duelId) {
+  function openRoom(duelId, focus = '') {
     setSelectedDuelId(duelId);
+    setRoomFocus(focus);
     setView('room');
   }
 
@@ -179,6 +184,7 @@ function App() {
     setSocket(null);
     setUnreadCount(0);
     setSelectedDuelId(null);
+    setRoomFocus('');
     setProfileTarget(null);
     setChallengeTarget(null);
     setToast('Session expirée. Reconnecte-toi.');
@@ -256,6 +262,7 @@ function App() {
     setSocket(null);
     setUnreadCount(0);
     setSelectedDuelId(null);
+    setRoomFocus('');
     setProfileTarget(null);
     setChallengeTarget(null);
     setView('landing');
@@ -448,6 +455,7 @@ function App() {
                 user={user}
                 refreshTick={refreshTick}
                 socket={socket}
+                focus={roomFocus}
                 onRefresh={refresh}
                 onBack={() => navigate('inbox')}
               />
@@ -554,6 +562,9 @@ function AuthView({ mode, onModeChange, onSuccess, onBack }) {
   const [form, setForm] = useState({
     username: '',
     efootballUsername: '',
+    firstName: '',
+    lastName: '',
+    phone: '',
     email: '',
     password: ''
   });
@@ -573,6 +584,9 @@ function AuthView({ mode, onModeChange, onSuccess, onBack }) {
         : {
             username: form.username,
             efootballUsername: form.efootballUsername,
+            firstName: form.firstName,
+            lastName: form.lastName,
+            phone: form.phone,
             email: form.email,
             password: form.password
           };
@@ -628,6 +642,36 @@ function AuthView({ mode, onModeChange, onSuccess, onBack }) {
                   value={form.efootballUsername}
                   onChange={(event) => setForm((current) => ({ ...current, efootballUsername: event.target.value }))}
                   placeholder="Pseudo exact eFootball"
+                  required
+                />
+              </label>
+              <label>
+                Prénom
+                <input
+                  value={form.firstName}
+                  onChange={(event) => setForm((current) => ({ ...current, firstName: event.target.value }))}
+                  placeholder="Ton prénom"
+                  autoComplete="given-name"
+                  required
+                />
+              </label>
+              <label>
+                Nom
+                <input
+                  value={form.lastName}
+                  onChange={(event) => setForm((current) => ({ ...current, lastName: event.target.value }))}
+                  placeholder="Ton nom"
+                  autoComplete="family-name"
+                  required
+                />
+              </label>
+              <label>
+                Téléphone
+                <input
+                  value={form.phone}
+                  onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+                  placeholder="+225..."
+                  autoComplete="tel"
                   required
                 />
               </label>
@@ -1435,9 +1479,39 @@ function InboxView({ user, refreshTick, onOpenRoom, onOpenProfile }) {
       .catch(() => {});
   }, [refreshTick]);
 
-  async function markRead(id) {
-    await api(`/notifications/${id}/read`, { method: 'PATCH' });
+  function markNotificationRead(id) {
     setNotifications((current) => current.map((item) => (item._id === id ? { ...item, isRead: true } : item)));
+  }
+
+  async function openNotification(item) {
+    setError('');
+    try {
+      await api(`/notifications/${item._id}/read`, { method: 'PATCH' });
+      markNotificationRead(item._id);
+
+      const metadata = item.metadata || {};
+      const duelId = metadata.duelId || metadata.duel;
+      const challengeId = metadata.challengeId || metadata.challenge;
+
+      if (duelId) {
+        onOpenRoom(duelId, item.type === 'duel:proof_received' ? 'proofs' : '');
+        return;
+      }
+
+      if (item.type === 'challenge:new' && challengeId) {
+        const data = await api(`/challenges/${challengeId}/accept`, { method: 'POST' });
+        setIncomingChallenges((current) => current.filter((challenge) => challenge._id !== challengeId));
+        if (data.duel?._id) onOpenRoom(data.duel._id);
+        return;
+      }
+
+      const linkedDuel = duels.find((duel) => String(duel.challenge?._id || duel.challenge) === String(challengeId));
+      if (linkedDuel?._id) {
+        onOpenRoom(linkedDuel._id);
+      }
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function acceptChallenge(id) {
@@ -1492,6 +1566,7 @@ function InboxView({ user, refreshTick, onOpenRoom, onOpenProfile }) {
             <h2>Répondre vite</h2>
           </div>
         </div>
+        {error && <p className="error">{error}</p>}
         <div className="list-stack">
           {incomingChallenges.map((challenge) => (
             <article key={challenge._id} className="challenge-card">
@@ -1526,7 +1601,7 @@ function InboxView({ user, refreshTick, onOpenRoom, onOpenProfile }) {
         </div>
         <div className="list-stack">
           {notifications.map((item) => (
-            <button key={item._id} type="button" className={`notification-item ${item.isRead ? '' : 'is-unread'}`} onClick={() => markRead(item._id)}>
+            <button key={item._id} type="button" className={`notification-item ${item.isRead ? '' : 'is-unread'}`} onClick={() => openNotification(item)}>
               <div>
                 <strong>{item.title}</strong>
                 <small>{item.body}</small>
@@ -1576,7 +1651,7 @@ function InboxView({ user, refreshTick, onOpenRoom, onOpenProfile }) {
   );
 }
 
-function RoomView({ duelId, user, refreshTick, socket, onRefresh, onBack }) {
+function RoomView({ duelId, user, refreshTick, socket, focus, onRefresh, onBack }) {
   const [duel, setDuel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1595,6 +1670,20 @@ function RoomView({ duelId, user, refreshTick, socket, onRefresh, onBack }) {
   const opponent = duel && String(duel.player1?._id || duel.player1) === String(user._id)
     ? duel.player2
     : duel?.player1;
+  const isPlayer1 = duel && String(duel.player1?._id || duel.player1) === String(user._id);
+  const isPlayer2 = duel && String(duel.player2?._id || duel.player2) === String(user._id);
+  const myResult = isPlayer1 ? duel?.resultPlayer1 : isPlayer2 ? duel?.resultPlayer2 : null;
+  const proofCards = duel
+    ? [
+        { key: 'player1', player: duel.player1, result: duel.resultPlayer1 },
+        { key: 'player2', player: duel.player2, result: duel.resultPlayer2 }
+      ].filter((item) => item.result?.screenshot)
+    : [];
+  const roomStateText = duel?.status === 'finished'
+    ? 'Statut: match termine'
+    : ['cancelled', 'dispute'].includes(duel?.status)
+      ? `Statut: ${labelForStatus(duel.status)}`
+      : 'Statut: salle en cours';
 
   useEffect(() => {
     let active = true;
@@ -1709,14 +1798,36 @@ function RoomView({ duelId, user, refreshTick, socket, onRefresh, onBack }) {
             <div className="panel-head">
               <div>
                 <p className="eyebrow">Statut</p>
-                <h2>{labelForStatus(duel.status)}</h2>
+                <h2>{roomStateText}</h2>
               </div>
               <span className={toneClass(duel.status)}>{duel.status}</span>
             </div>
             <p className="muted">{downloadableText(duel.rules) || 'Règles non précisées.'}</p>
           </div>
 
-          {!['finished', 'dispute', 'cancelled'].includes(duel.status) && (
+          {proofCards.length > 0 && (
+            <div className={`panel ${focus === 'proofs' ? 'is-focused' : ''}`}>
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">Captures</p>
+                  <h2>Preuves envoyees</h2>
+                </div>
+              </div>
+              <div className="proof-grid">
+                {proofCards.map((item) => (
+                  <article key={item.key} className="proof-card">
+                    <div>
+                      <strong>{toDisplayName(item.player)}</strong>
+                      <small>{item.result.score} · {timeAgo(item.result.submittedAt)}</small>
+                    </div>
+                    <img className="proof-preview" src={item.result.screenshot} alt={`Capture de ${toDisplayName(item.player)}`} />
+                  </article>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!myResult && !['finished', 'dispute', 'cancelled'].includes(duel.status) && (
             <form className="panel form-panel" onSubmit={submitProof}>
             <div className="panel-head">
               <div>
@@ -1750,6 +1861,18 @@ function RoomView({ duelId, user, refreshTick, socket, onRefresh, onBack }) {
               Envoyer la preuve
             </button>
             </form>
+          )}
+
+          {myResult && !['finished', 'dispute', 'cancelled'].includes(duel.status) && (
+            <div className="panel">
+              <div className="panel-head">
+                <div>
+                  <p className="eyebrow">Preuve</p>
+                  <h2>Capture deja envoyee</h2>
+                </div>
+              </div>
+              <p className="muted">La salle reste ouverte pendant que l'autre joueur envoie sa preuve ou que le verdict arrive.</p>
+            </div>
           )}
 
           <div className="panel">

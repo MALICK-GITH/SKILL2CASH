@@ -67,6 +67,7 @@ challengeRouter.post('/', requireFields(['challengedId', 'amount']), asyncHandle
     matchType: req.body.matchType || 'eFootball 1v1',
     rules: req.body.rules || 'Standard 10 min, no cheats, screenshot required.',
     message: req.body.message || '',
+    roomId: `challenge-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     expiresAt: new Date(Date.now() + minutes * 60 * 1000)
   });
 
@@ -75,7 +76,12 @@ challengeRouter.post('/', requireFields(['challengedId', 'amount']), asyncHandle
     amount,
     challengedUsername: challenged.efootballUsername || challenged.username
   });
-  await notifyUser(challenged._id, 'challenge:new', { challengeId: challenge._id, from: req.user.efootballUsername || req.user.username, amount });
+  await notifyUser(challenged._id, 'challenge:new', {
+    challengeId: challenge._id,
+    from: req.user.efootballUsername || req.user.username,
+    amount,
+    action: 'accept_challenge'
+  });
   await notifyAdmins('admin:challenge_created', {
     challengeId: challenge._id,
     amount,

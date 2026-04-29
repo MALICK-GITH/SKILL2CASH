@@ -4,17 +4,25 @@ const challengeSchema = new mongoose.Schema(
   {
     challenger: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     challenged: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    challengerGameProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'GameProfile', default: null },
+    challengedGameProfile: { type: mongoose.Schema.Types.ObjectId, ref: 'GameProfile', default: null },
+    room: { type: mongoose.Schema.Types.ObjectId, ref: 'Room', default: null },
     amount: { type: Number, required: true, min: 1 },
-    matchType: { type: String, default: 'eFootball 1v1' },
-    rules: { type: String, default: 'Standard 10 min, no cheats, screenshot required.' },
+    matchType: { type: String, default: '1v1' },
+    rules: { type: String, default: 'Standard match, no cheats, screenshot required.' },
     message: { type: String, default: '' },
     status: {
       type: String,
-      enum: ['pending', 'accepted', 'declined', 'expired', 'cancelled', 'counter_offer'],
+      enum: ['pending', 'accepted', 'declined', 'expired', 'cancelled', 'counter_offer', 'in_progress', 'completed', 'disputed'],
       default: 'pending'
     },
     counterAmount: { type: Number, default: null },
-    expiresAt: { type: Date, required: true }
+    scheduledTime: { type: Date, default: null },
+    matchCode: { type: String, default: null, unique: true, sparse: true },
+    roomId: { type: String, required: true, unique: true },
+    expiresAt: { type: Date, required: true },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null }
   },
   { timestamps: true }
 );

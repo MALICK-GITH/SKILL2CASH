@@ -5,9 +5,21 @@ import { buildTrustProfile, calculateTrustScore, trustTierForScore } from '../se
 const userSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 24 },
+    firstName: { type: String, required: true, trim: true },
+    lastName: { type: String, required: true, trim: true },
     efootballUsername: { type: String, required: true, unique: true, trim: true, minlength: 3, maxlength: 24 },
     usernameLocked: { type: Boolean, default: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    phone: { type: String, required: true, trim: true, unique: true },
+    phoneValidated: { type: Boolean, default: false },
+    telegramId: { type: String, default: null, sparse: true },
+    telegramData: {
+      id: { type: String, default: null },
+      firstName: { type: String, default: null },
+      lastName: { type: String, default: null },
+      username: { type: String, default: null },
+      languageCode: { type: String, default: null }
+    },
     passwordHash: { type: String, required: true },
     avatar: { type: String, default: '' },
     country: { type: String, default: 'Global' },
@@ -27,7 +39,28 @@ const userSchema = new mongoose.Schema(
     maxStake: { type: Number, default: 25000 },
     blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     isBanned: { type: Boolean, default: false },
-    deletedAt: { type: Date, default: null }
+    deletedAt: { type: Date, default: null },
+    notificationPreferences: {
+      email: {
+        challenges: { type: Boolean, default: true },
+        matches: { type: Boolean, default: true },
+        results: { type: Boolean, default: true },
+        wallet: { type: Boolean, default: true },
+        promotions: { type: Boolean, default: false }
+      },
+      push: {
+        challenges: { type: Boolean, default: true },
+        matches: { type: Boolean, default: true },
+        results: { type: Boolean, default: true },
+        wallet: { type: Boolean, default: true }
+      },
+      telegram: {
+        challenges: { type: Boolean, default: true },
+        matches: { type: Boolean, default: true },
+        results: { type: Boolean, default: true },
+        wallet: { type: Boolean, default: true }
+      }
+    }
   },
   { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } }
 );

@@ -168,13 +168,23 @@ export async function submitResult(duelId, userId, result) {
       duel.autoValidationReason = ocr.error || '';
 
       if (duel.resultPlayer1 && !duel.resultPlayer2) {
-        await notifyUser(duel.player1, 'duel:proof_submitted', { duelId: duel._id, roomId: duel.roomId });
-        await notifyUser(duel.player2, 'duel:proof_received', { duelId: duel._id, roomId: duel.roomId });
+        await notifyUser(duel.player1, 'duel:proof_submitted', { duelId: duel._id, roomId: duel.roomId, proofBy: duel.player1 });
+        await notifyUser(duel.player2, 'duel:proof_received', {
+          duelId: duel._id,
+          roomId: duel.roomId,
+          proofBy: duel.player1,
+          proofRole: 'player1'
+        });
         await notifyUser(duel.player1, 'duel:result_pending', { duelId: duel._id, roomId: duel.roomId });
       }
       if (duel.resultPlayer2 && !duel.resultPlayer1) {
-        await notifyUser(duel.player2, 'duel:proof_submitted', { duelId: duel._id, roomId: duel.roomId });
-        await notifyUser(duel.player1, 'duel:proof_received', { duelId: duel._id, roomId: duel.roomId });
+        await notifyUser(duel.player2, 'duel:proof_submitted', { duelId: duel._id, roomId: duel.roomId, proofBy: duel.player2 });
+        await notifyUser(duel.player1, 'duel:proof_received', {
+          duelId: duel._id,
+          roomId: duel.roomId,
+          proofBy: duel.player2,
+          proofRole: 'player2'
+        });
         await notifyUser(duel.player2, 'duel:result_pending', { duelId: duel._id, roomId: duel.roomId });
       }
 

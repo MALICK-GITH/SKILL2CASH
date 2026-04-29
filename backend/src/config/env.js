@@ -24,5 +24,6 @@ export const env = {
   aiBaseUrl: process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com',
   aiToken: process.env.ANTHROPIC_AUTH_TOKEN || process.env.ANTHROPIC_API_KEY || '',
   aiModel: process.env.ANTHROPIC_MODEL || process.env.ANTHROPIC_DEFAULT_SONNET_MODEL || 'claude-sonnet-4-20250514',
-  aiMaxTokens: Number(process.env.ANTHROPIC_MAX_TOKENS || 700)
+  aiMaxTokens: Number(process.env.ANTHROPIC_MAX_TOKENS || 700),
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || ''
 };

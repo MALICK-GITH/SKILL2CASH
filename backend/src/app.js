@@ -8,11 +8,20 @@ import morgan from 'morgan';
 import { env } from './config/env.js';
 import { adminRouter } from './routes/adminRoutes.js';
 import { assistantRouter } from './routes/assistantRoutes.js';
+import arbitrationRouter from './routes/arbitrationRoutes.js';
 import { authRouter } from './routes/authRoutes.js';
 import { challengeRouter } from './routes/challengeRoutes.js';
+import chatMessageRouter from './routes/chatMessageRoutes.js';
 import { duelRouter } from './routes/duelRoutes.js';
+import gameProfileRouter from './routes/gameProfileRoutes.js';
+import gameRouter from './routes/gameRoutes.js';
 import { leaderboardRouter } from './routes/leaderboardRoutes.js';
 import { notificationRouter } from './routes/notificationRoutes.js';
+import platformRouter from './routes/platformRoutes.js';
+import publicInvitationRouter from './routes/publicInvitationRoutes.js';
+import roomRouter from './routes/roomRoutes.js';
+import streamRouter from './routes/streamRoutes.js';
+import telegramRouter from './routes/telegramRoutes.js';
 import { userRouter } from './routes/userRoutes.js';
 import { walletRouter } from './routes/walletRoutes.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
@@ -59,7 +68,16 @@ export function createApp() {
         duels: '/api/duels',
         leaderboard: '/api/leaderboard',
         admin: '/api/admin',
-        assistant: '/api/assistant'
+        assistant: '/api/assistant',
+        games: '/api/games',
+        platforms: '/api/platforms',
+        gameProfiles: '/api/game-profiles',
+        rooms: '/api/rooms',
+        streams: '/api/streams',
+        arbitrations: '/api/arbitrations',
+        publicInvitations: '/api/public-invitations',
+        chatMessages: '/api/chat-messages',
+        telegram: '/api/telegram'
       }
     }));
   }
@@ -73,6 +91,15 @@ export function createApp() {
   app.use('/api/notifications', notificationRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/assistant', assistantRouter);
+  app.use('/api/games', gameRouter);
+  app.use('/api/platforms', platformRouter);
+  app.use('/api/game-profiles', gameProfileRouter);
+  app.use('/api/rooms', roomRouter);
+  app.use('/api/streams', streamRouter);
+  app.use('/api/arbitrations', arbitrationRouter);
+  app.use('/api/public-invitations', publicInvitationRouter);
+  app.use('/api/telegram', telegramRouter);
+  app.use('/api/chat-messages', chatMessageRouter);
 
   app.use(notFound);
   app.use(errorHandler);

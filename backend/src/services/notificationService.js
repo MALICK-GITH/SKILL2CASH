@@ -105,12 +105,15 @@ function buildNotificationContent(event, payload = {}) {
 async function persistNotification(userId, event, payload = {}) {
   if (!userId) return null;
   const content = buildNotificationContent(event, payload);
+  const duelId = payload.duelId || payload.duel;
+  const challengeId = payload.challengeId || payload.challenge;
+  const link = content.link || payload.link || (duelId ? `/duels/${duelId}` : challengeId ? `/challenges/${challengeId}` : '');
   return Notification.create({
     user: userId,
     type: event,
     title: content.title,
     body: content.body,
-    link: content.link || payload.link || '',
+    link,
     metadata: payload
   });
 }

@@ -714,6 +714,26 @@ textarea {
   background: rgba(17, 32, 51, 0.04);
 }
 
+.panel.is-focused {
+  border-color: rgba(36, 87, 255, 0.55);
+  box-shadow: 0 0 0 3px rgba(36, 87, 255, 0.12), var(--shadow);
+}
+
+.proof-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.proof-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(17, 32, 51, 0.02);
+}
+
 .list-stack {
   display: grid;
   gap: 10px;

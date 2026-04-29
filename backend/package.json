@@ -10,6 +10,7 @@
     "start:memory": "cross-env MONGO_URI=memory node src/server.js",
     "seed": "node src/seed/seed.js",
     "seed:memory": "cross-env MONGO_URI=memory node src/seed/seed.js",
+    "seed:games": "node src/seed/seedGamesPlatformsRooms.js",
     "create-admin": "node src/seed/createAdmin.js",
     "test": "node --test --test-isolation=none"
   },
