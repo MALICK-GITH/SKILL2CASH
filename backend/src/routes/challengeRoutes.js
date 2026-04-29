@@ -19,6 +19,11 @@ export function openChallengeFilter(userId, role) {
   };
 }
 
+export function isRequesterBlocked(challenged, requesterId) {
+  const blockedUsers = Array.isArray(challenged?.blockedUsers) ? challenged.blockedUsers : [];
+  return blockedUsers.some((id) => String(id) === String(requesterId));
+}
+
 function requireOpenChallenge(challenge) {
   if (!challenge) throw new AppError('Défi non trouvé', 404);
   if (!OPEN_CHALLENGE_STATUSES.includes(challenge.status)) {
@@ -31,7 +36,7 @@ function requireOpenChallenge(challenge) {
 
 challengeRouter.get('/public', asyncHandler(async (req, res) => {
   const limit = Math.min(Math.max(Number(req.query.limit || 12), 1), 24);
-  const challenges = await Challenge.find({ status: { $in: ['pending', 'counter_offer'] } })
+  const challenges = await Challenge.find({ status: { $in: OPEN_CHALLENGE_STATUSES } })
     .populate('challenger', 'username efootballUsername avatar country rank status reputation winRate minStake maxStake')
     .populate('challenged', 'username efootballUsername avatar country rank status reputation winRate minStake maxStake')
     .sort({ createdAt: -1 })
@@ -62,7 +67,7 @@ challengeRouter.post('/', requireFields(['challengedId', 'amount']), asyncHandle
 
   const challenged = await User.findById(req.body.challengedId);
   if (!challenged || challenged.isBanned) throw new AppError('Joueur défié non trouvé', 404);
-  if (challenged.blockedUsers.some((id) => String(id) === String(req.user._id))) throw new AppError('Ce joueur vous a bloqué', 403);
+  if (isRequesterBlocked(challenged, req.user._id)) throw new AppError('Ce joueur vous a bloqué', 403);
 
   const wallet = await ensureWallet(req.user._id);
   if (wallet.balanceAvailable < amount) throw new AppError('Solde disponible insuffisant', 422);
@@ -147,7 +152,7 @@ challengeRouter.post('/:id/counter', requireFields(['counterAmount']), asyncHand
 challengeRouter.post('/:id/cancel', asyncHandler(async (req, res) => {
   const challenge = await Challenge.findOne({ _id: req.params.id, challenger: req.user._id });
   if (!challenge) throw new AppError('Défi non trouvé', 404);
-  if (!['pending', 'counter_offer'].includes(challenge.status)) {
+  if (!OPEN_CHALLENGE_STATUSES.includes(challenge.status)) {
     throw new AppError('Un défi déjà traité ne peut pas être annulé ici', 422);
   }
   if (challenge.expiresAt < new Date()) {

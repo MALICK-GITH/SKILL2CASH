@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calculateCommission } from '../src/services/commissionService.js';
 import { shouldAutoApproveWithOcr } from '../src/services/ocrService.js';
-import { OPEN_CHALLENGE_STATUSES, openChallengeFilter } from '../src/routes/challengeRoutes.js';
+import { OPEN_CHALLENGE_STATUSES, openChallengeFilter, isRequesterBlocked } from '../src/routes/challengeRoutes.js';
 import { badgeForUser, rankForUser } from '../src/services/rankService.js';
 import { buildTrustProfile, calculateTrustScore } from '../src/services/trustService.js';
 import { validateEfootballUsername } from '../src/utils/username.js';
@@ -78,6 +78,12 @@ test('incoming and outgoing challenge lists only expose open statuses', () => {
     challenger: 'user-2',
     status: { $in: ['pending', 'counter_offer'] }
   });
+});
+
+test('blocked challenger lookup tolerates missing blockedUsers arrays', () => {
+  assert.equal(isRequesterBlocked({}, 'user-1'), false);
+  assert.equal(isRequesterBlocked({ blockedUsers: null }, 'user-1'), false);
+  assert.equal(isRequesterBlocked({ blockedUsers: ['user-1'] }, 'user-1'), true);
 });
 
 test('trust score rewards reliable and consistent players', () => {
