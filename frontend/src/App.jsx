@@ -1909,15 +1909,11 @@ function RoomView({ duelId, user, refreshTick, socket, focus, onRefresh, onBack 
 function ProfileView({ user, target, refreshTick, onOpenChallenge, onGoAdmin, onUserUpdate }) {
   const [profile, setProfile] = useState(target || user);
   const [recentDuels, setRecentDuels] = useState([]);
-  const [editingStatus, setEditingStatus] = useState(user.status || 'available');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     const targetId = target?._id || user._id;
     if (String(targetId) === String(user._id)) {
       setProfile(user);
-      setEditingStatus(user.status || 'available');
       setRecentDuels([]);
       return;
     }
@@ -1929,23 +1925,6 @@ function ProfileView({ user, target, refreshTick, onOpenChallenge, onGoAdmin, on
       })
       .catch(() => {});
   }, [target?._id, user._id, refreshTick]);
-
-  async function saveStatus() {
-    setSaving(true);
-    setError('');
-    try {
-      const data = await api('/users/profile', {
-        method: 'PATCH',
-        body: { status: editingStatus }
-      });
-      setProfile(data.user);
-      onUserUpdate?.(data.user);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
 
   const isSelf = !target || String(target._id) === String(user._id);
 
@@ -1990,38 +1969,6 @@ function ProfileView({ user, target, refreshTick, onOpenChallenge, onGoAdmin, on
           </article>
         </div>
       </div>
-
-      {isSelf ? (
-        <div className="panel form-panel">
-          <div className="panel-head">
-            <div>
-              <p className="eyebrow">Paramètres</p>
-              <h2>Statut rapide</h2>
-            </div>
-          </div>
-          <label>
-            Disponibilité
-            <select value={editingStatus} onChange={(event) => setEditingStatus(event.target.value)}>
-              <option value="available">Disponible</option>
-              <option value="online">En ligne</option>
-              <option value="busy">Occupé</option>
-              <option value="offline">Hors ligne</option>
-            </select>
-          </label>
-          {error && <p className="error">{error}</p>}
-          <button type="button" className="primary-button" onClick={saveStatus} disabled={saving}>
-            {saving ? <Loader2 size={16} className="spin" aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
-            Enregistrer
-          </button>
-        </div>
-      ) : (
-        <div className="panel">
-          <button type="button" className="primary-button" onClick={() => onOpenChallenge(profile)}>
-            <Swords size={16} aria-hidden="true" />
-            Défier
-          </button>
-        </div>
-      )}
 
       {!isSelf && (
         <div className="panel">
