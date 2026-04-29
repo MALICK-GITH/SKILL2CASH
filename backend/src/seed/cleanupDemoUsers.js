@@ -12,7 +12,9 @@ const DEMO_PATTERNS = [
   /skill2cash\.test/i,
   /testplayer/i,
   /p1_/i,
-  /p2_/i
+  /p2_/i,
+  /wjwbsi/i,
+  /aiso/i
 ];
 
 async function cleanupDemoUsers() {
@@ -26,9 +28,9 @@ async function cleanupDemoUsers() {
     // Trouver tous les utilisateurs qui correspondent aux critères de démo
     const demoUsers = await User.find({
       $or: [
-        { email: { $in: DEMO_PATTERNS.map(pattern => ({ $regex: pattern })) } },
-        { username: { $in: DEMO_PATTERNS.map(pattern => ({ $regex: pattern })) } },
-        { efootballUsername: { $in: DEMO_PATTERNS.map(pattern => ({ $regex: pattern })) } }
+        ...DEMO_PATTERNS.map(pattern => ({ email: { $regex: pattern } })),
+        ...DEMO_PATTERNS.map(pattern => ({ username: { $regex: pattern } })),
+        ...DEMO_PATTERNS.map(pattern => ({ efootballUsername: { $regex: pattern } }))
       ]
     }).session(session);
 
