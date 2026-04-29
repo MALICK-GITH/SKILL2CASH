@@ -5,6 +5,9 @@ function requireAdminConfig() {
   const username = String(process.env.ADMIN_USERNAME || '').trim();
   const email = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
   const password = String(process.env.ADMIN_PASSWORD || '');
+  const firstName = String(process.env.ADMIN_FIRST_NAME || '').trim();
+  const lastName = String(process.env.ADMIN_LAST_NAME || '').trim();
+  const phone = String(process.env.ADMIN_PHONE || '').trim();
   const country = String(process.env.ADMIN_COUNTRY || "Cote d'Ivoire").trim();
   const level = String(process.env.ADMIN_LEVEL || 'Elite').trim();
   const efootballUsername = String(process.env.ADMIN_EFOOTBALL_USERNAME || username).trim();
@@ -12,8 +15,11 @@ function requireAdminConfig() {
   if (!username || !email || !password) {
     throw new Error('ADMIN_USERNAME, ADMIN_EMAIL and ADMIN_PASSWORD are required to create the admin account');
   }
+  if (!firstName || !lastName || !phone) {
+    throw new Error('ADMIN_FIRST_NAME, ADMIN_LAST_NAME and ADMIN_PHONE are required to create the admin account');
+  }
 
-  return { username, email, password, country, level, efootballUsername };
+  return { username, email, password, firstName, lastName, phone, country, level, efootballUsername };
 }
 
 export async function upsertAdminAccount({ createWallet = true } = {}) {
@@ -23,7 +29,10 @@ export async function upsertAdminAccount({ createWallet = true } = {}) {
   const existing = await User.findOne({ email: config.email });
   if (existing) {
     existing.username = config.username;
+    existing.firstName = config.firstName;
+    existing.lastName = config.lastName;
     existing.efootballUsername = config.efootballUsername;
+    existing.phone = config.phone;
     existing.role = 'admin';
     existing.country = config.country;
     existing.level = config.level;
@@ -41,8 +50,11 @@ export async function upsertAdminAccount({ createWallet = true } = {}) {
 
   const admin = await User.create({
     username: config.username,
+    firstName: config.firstName,
+    lastName: config.lastName,
     efootballUsername: config.efootballUsername,
     email: config.email,
+    phone: config.phone,
     country: config.country,
     level: config.level,
     role: 'admin',
