@@ -1514,29 +1514,42 @@ function InboxView({ user, refreshTick, onOpenRoom, onOpenProfile }) {
   }
 
   async function acceptChallenge(id) {
-    const data = await api(`/challenges/${id}/accept`, { method: 'POST' });
-    if (data.duel?._id) onOpenRoom(data.duel._id);
+    try {
+      const data = await api(`/challenges/${id}/accept`, { method: 'POST' });
+      setIncomingChallenges((current) => current.filter((item) => item._id !== id));
+      if (data.duel?._id) onOpenRoom(data.duel._id);
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function declineChallenge(id) {
-    await api(`/challenges/${id}/decline`, { method: 'POST' });
-    setIncomingChallenges((current) => current.filter((item) => item._id !== id));
+    try {
+      await api(`/challenges/${id}/decline`, { method: 'POST' });
+      setIncomingChallenges((current) => current.filter((item) => item._id !== id));
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   async function counterChallenge(id) {
-    const rawValue = window.prompt('Montant de contre-proposition', '');
-    if (rawValue === null) return;
-    const counterAmount = Number(rawValue);
-    if (!Number.isFinite(counterAmount) || counterAmount <= 0) {
-      setError('Le montant de contre-proposition doit être un nombre positif.');
-      return;
-    }
+    try {
+      const rawValue = window.prompt('Montant de contre-proposition', '');
+      if (rawValue === null) return;
+      const counterAmount = Number(rawValue);
+      if (!Number.isFinite(counterAmount) || counterAmount <= 0) {
+        setError('Le montant de contre-proposition doit être un nombre positif.');
+        return;
+      }
 
-    await api(`/challenges/${id}/counter`, {
-      method: 'POST',
-      body: { counterAmount }
-    });
-    setIncomingChallenges((current) => current.filter((item) => item._id !== id));
+      await api(`/challenges/${id}/counter`, {
+        method: 'POST',
+        body: { counterAmount }
+      });
+      setIncomingChallenges((current) => current.filter((item) => item._id !== id));
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   const activeDuels = duels.filter((duel) => ['active', 'waiting_player1_proof', 'waiting_player2_proof', 'analyzing', 'dispute'].includes(duel.status));
