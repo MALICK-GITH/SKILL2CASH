@@ -916,7 +916,6 @@ function PlayView({ user, refreshTick, initialTarget, onOpenProfile, onChallenge
               <small>SK2C: {player.username}</small>
             </div>
             <div className="player-meta">
-              <span className={toneClass(player.status)}>{labelForStatus(player.status)}</span>
               <small>{player.winRate || 0}% win rate</small>
               <small>{moneyOrDash(player.totalEarnings)}</small>
             </div>
@@ -1950,7 +1949,6 @@ function ProfileView({ user, target, refreshTick, onOpenChallenge, onGoAdmin, on
           <div className="profile-copy">
             <strong>{profile.efootballUsername || profile.username}</strong>
             <small>SK2C: {profile.username}</small>
-            <span className={toneClass(profile.status)}>{labelForStatus(profile.status)}</span>
           </div>
         </div>
 
@@ -2065,6 +2063,16 @@ function AdminView({ refreshTick, onRefresh }) {
     load();
   }
 
+  async function cancelDispute(id) {
+    await api(`/admin/disputes/${id}/resolve`, {
+      method: 'POST',
+      body: { action: 'cancel', reason: note || 'Litige résolu par remboursement' }
+    });
+    setNote('');
+    onRefresh();
+    load();
+  }
+
   return (
     <section className="page-stack">
       <div className="metric-grid">
@@ -2156,7 +2164,8 @@ function AdminView({ refreshTick, onRefresh }) {
               </div>
               <div className="inline-actions">
                 <button type="button" className="secondary-button" onClick={() => resolveDispute(duel._id, duel.player1?._id || duel.player1)}>J1 gagne</button>
-                <button type="button" className="primary-button" onClick={() => resolveDispute(duel._id, duel.player2?._id || duel.player2)}>J2 gagne</button>
+                <button type="button" className="secondary-button" onClick={() => resolveDispute(duel._id, duel.player2?._id || duel.player2)}>J2 gagne</button>
+                <button type="button" className="ghost-button" onClick={() => cancelDispute(duel._id)}>Rembourser</button>
               </div>
             </article>
           ))}
