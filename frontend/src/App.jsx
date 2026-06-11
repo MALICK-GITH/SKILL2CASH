@@ -588,7 +588,7 @@ function assistantQuickPrompts(user, view) {
 function assistantWelcomeMessage(user, view) {
   const greeting = assistantGreetingForHour(new Date().getHours());
   const displayName = user?.firstName || user?.lastName
-    ? [user.firstName, user.lastName].filter(Boolean).join(' ? ').trim()
+    ? [user.firstName, user.lastName].filter(Boolean).join(' ').trim()
     : user?.efootballUsername || user?.username || 'joueur';
   const suffix = user?.role === 'admin'
     ? 'Je peux t aider sur les litiges, les dépôts, les retraits et les actions admin.'
@@ -1575,7 +1575,7 @@ function PlayView({ user, refreshTick, initialTarget, onOpenProfile, onChallenge
         player.country
       ]
         .filter(Boolean)
-        .join(' ? ')
+        .join(' ')
         .toLowerCase();
       return haystack.includes(normalizedQuery);
     });
@@ -3643,7 +3643,7 @@ function AdminView({ refreshTick, onRefresh, focusInboxItemId = '' }) {
         toDisplayName(user)
       ]
         .filter(Boolean)
-        .join(' ? ')
+        .join(' ')
         .toLowerCase();
       return haystack.includes(normalized);
     });
