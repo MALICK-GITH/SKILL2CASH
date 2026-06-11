@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-cyber-black text-white;
+  }
+}
+
+@layer components {
+  .cyber-card {
+    @apply bg-cyber-card border border-cyber-primary/20 rounded-xl p-6;
+    @apply hover:border-cyber-primary/50 transition-all duration-300;
+    @apply hover:scale-105 hover:shadow-lg hover:shadow-cyber-primary/20;
+  }
+
+  .cyber-button {
+    @apply bg-gradient-to-r from-cyber-primary to-cyber-secondary;
+    @apply text-cyber-black font-bold px-6 py-3 rounded-lg;
+    @apply hover:scale-105 transition-transform duration-200;
+    @apply hover:shadow-lg hover:shadow-cyber-primary/30;
+    @apply focus:outline-none focus:ring-2 focus:ring-cyber-primary focus:ring-offset-2 focus:ring-offset-cyber-black;
+  }
+
+  .cyber-input {
+    @apply bg-cyber-dark border border-cyber-primary/30 rounded-lg px-4 py-3;
+    @apply text-white placeholder-gray-300;
+    @apply focus:border-cyber-primary focus:outline-none focus:ring-2 focus:ring-cyber-primary/20;
+  }
+
+  .cyber-badge {
+    @apply bg-cyber-danger text-white text-xs font-bold px-2 py-1 rounded-full;
+  }
+
+  .progress-bar {
+    @apply bg-cyber-dark rounded-full h-2 overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply bg-gradient-to-r from-cyber-primary to-cyber-accent h-full transition-all duration-500;
+  }
+
+  /* Focus visible pour navigation clavier */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-cyber-primary ring-offset-2 ring-offset-cyber-black;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .cyber-card,
+  .cyber-button,
+  .community-link,
+  .assistant-launcher,
+  .assistant-quick-chip,
+  .assistant-close {
+    transform: none !important;
+  }
+
+  .cyber-card:hover,
+  .cyber-button:hover,
+  .community-link:hover {
+    transform: none !important;
+    box-shadow: inherit;
+  }
+}

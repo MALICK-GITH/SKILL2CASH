@@ -1,0 +1,26 @@
+:root {
+  --color-bg-primary: var(--bg);
+  --color-bg-secondary: var(--bg-2);
+  --color-surface-primary: var(--panel-solid);
+  --color-surface-glass: var(--panel);
+  --color-border-soft: var(--line);
+  --color-border-strong: var(--line-strong);
+  --color-text-primary: var(--text);
+  --color-text-muted: var(--muted);
+  --color-brand-primary: var(--accent);
+  --color-brand-secondary: var(--accent-2);
+  --color-success: var(--pitch);
+  --color-warning: var(--warn);
+  --color-danger: var(--danger);
+  --radius-card: var(--radius-lg);
+  --radius-control: var(--radius-md);
+  --shadow-card: var(--shadow);
+  --shadow-elevated: var(--shadow-lg);
+  --shadow-brand: var(--shadow-accent);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+}

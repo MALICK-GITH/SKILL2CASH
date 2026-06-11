@@ -1,0 +1,16 @@
+# Secrets / credentials
+*.txt
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
