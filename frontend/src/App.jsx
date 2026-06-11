@@ -339,12 +339,12 @@ function normalizeSocketNotification(n) {
   if (!n || !n._id) return null;
   return {
     _id: n._id,
-    user: n.userId ? n.user,
+    user: n.userId || n.user || null,
     type: n.type,
     title: n.title,
-    body: n.message ? n.body ? '',
+    body: n.message || n.body || '',
     metadata: n.data && typeof n.data === 'object' ? n.data : n.metadata || {},
-    isRead: Boolean(n.read ? n.isRead),
+    isRead: Boolean(n.read ?? n.isRead),
     priority: n.priority || 'medium',
     createdAt: n.createdAt,
     domainEvent: n.domainEvent
@@ -401,7 +401,7 @@ function playNotificationTone() {
 }
 
 function walletBalance(user) {
-  return user?.wallet?.balanceAvailable ? user?.balanceAvailable ? 0;
+  return Number(user?.wallet?.balanceAvailable ?? user?.balanceAvailable ?? 0);
 }
 
 function getRouteFromLocation(hasUser = false) {
@@ -459,7 +459,7 @@ function toDisplayName(user) {
 /** Nom affichable pour un dépôt (profil plateforme), distinct du pseudo eFootball. */
 function senderNameFromAccount(user) {
   if (!user) return '';
-  const full = [user.firstName, user.lastName].filter(Boolean).join(' ? ').trim();
+  const full = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
   if (full) return full;
   return user.username || user.efootballUsername || '';
 }
@@ -821,7 +821,7 @@ function App() {
     }
 
     api('/notifications/unread-count')
-      .then((data) => setUnreadCount(Number(data.count ? data.unreadCount ? 0)))
+      .then((data) => setUnreadCount(Number(data?.count ?? data?.unreadCount ?? 0)))
       .catch(() => { });
   }, [user, refreshTick]);
 
@@ -2207,7 +2207,7 @@ function InboxView({ user, refreshTick, onOpenRoom, onOpenProfile, onReadAllComp
       const res = await api('/notifications/clear-all', { method: 'DELETE' });
       setNotifications([]);
       setSelectedNotificationId('');
-      onUnreadCount?.(Number(res?.unreadCount ? 0));
+      onUnreadCount?.(Number(res?.unreadCount ?? 0));
     } catch (err) {
       setError(err.message);
     }
@@ -2242,7 +2242,7 @@ function InboxView({ user, refreshTick, onOpenRoom, onOpenProfile, onReadAllComp
     const body = String(item.body || '').toLowerCase();
     const title = String(item.title || '').toLowerCase();
     const actor = String(item.metadata?.actor?.username || item.metadata?.actor?.efootballUsername || item.metadata?.username || '').toLowerCase();
-    const amount = String(item.metadata?.amount ? '').toLowerCase();
+    const amount = String(item.metadata?.amount || '').toLowerCase();
     const categoryOk = notificationFilter === 'all'
       ? true
       : notificationFilter === 'unread'
@@ -2739,7 +2739,7 @@ function RoomView({ duelId, user, refreshTick, socket, focus, onRefresh, onBack 
       duel.ocrScorePlayer1 ? `Capture 1: ${duel.ocrScorePlayer1} (${duel.ocrConfidencePlayer1 || 0}%)` : '',
       duel.ocrScorePlayer2 ? `Capture 2: ${duel.ocrScorePlayer2} (${duel.ocrConfidencePlayer2 || 0}%)` : '',
       duel.manualReviewDueAt ? `Contrôle admin attendu avant ${timeAgo(duel.manualReviewDueAt)}` : ''
-    ].filter(Boolean).join(' ? ')
+    ].filter(Boolean).join(' · ')
     : '';
   const realtimeProofHint = isParticipant && myResult && !opponentResult
     ? 'Ta preuve a ete envoyee. En attente de ton adversaire.'
@@ -3615,8 +3615,8 @@ function AdminView({ refreshTick, onRefresh, focusInboxItemId = '' }) {
   function convertToCSV(data) {
     if (!data || !data.length) return '';
     const headers = Object.keys(data[0]);
-    const rows = data.map(row => headers.map(h => JSON.stringify(row[h] || '')).join(' ? '));
-    return [headers.join(' ? '), ...rows].join('\n');
+    const rows = data.map((row) => headers.map((h) => JSON.stringify(row[h] || '')).join(','));
+    return [headers.join(','), ...rows].join('\n');
   }
 
   function downloadCSV(csv, filename) {
@@ -4157,7 +4157,7 @@ function AdminView({ refreshTick, onRefresh, focusInboxItemId = '' }) {
                   {formatFraudFlags(selectedInboxItem.payload.fraudFlags).length > 0 && (
                     <div className="detail-kv detail-kv--reason">
                       <span>Signaux</span>
-                      <strong>{formatFraudFlags(selectedInboxItem.payload.fraudFlags).join(' ? ')}</strong>
+                      <strong>{formatFraudFlags(selectedInboxItem.payload.fraudFlags).join(' · ')}</strong>
                     </div>
                   )}
                   {selectedInboxItem.payload.screenshotUrl && (
@@ -4193,7 +4193,7 @@ function AdminView({ refreshTick, onRefresh, focusInboxItemId = '' }) {
                   {formatFraudFlags(selectedInboxItem.payload.fraudFlags).length > 0 && (
                     <div className="detail-kv detail-kv--reason">
                       <span>Signaux</span>
-                      <strong>{formatFraudFlags(selectedInboxItem.payload.fraudFlags).join(' ? ')}</strong>
+                      <strong>{formatFraudFlags(selectedInboxItem.payload.fraudFlags).join(' · ')}</strong>
                     </div>
                   )}
                 </div>
@@ -4226,7 +4226,7 @@ function AdminView({ refreshTick, onRefresh, focusInboxItemId = '' }) {
                   {disputeSignalSummary(selectedInboxItem.payload).length > 0 && (
                     <div className="detail-kv detail-kv--reason">
                       <span>Indicateurs</span>
-                      <strong>{disputeSignalSummary(selectedInboxItem.payload).join(' ? ')}</strong>
+                      <strong>{disputeSignalSummary(selectedInboxItem.payload).join(' · ')}</strong>
                     </div>
                   )}
                   {(disputeProofPlayer1 || disputeProofPlayer2) && (
@@ -4433,7 +4433,7 @@ function AdminView({ refreshTick, onRefresh, focusInboxItemId = '' }) {
                 <div>
                   <strong>{toDisplayName(user)}</strong>
                   <small>{user.email} · {user.country || 'Global'} · {user.isBanned ? 'Banni' : 'Actif'}</small>
-                  <small>Solde : {moneyOrDash(wallet?.balanceAvailable ? 0)} · Bloqué : {moneyOrDash(wallet?.balanceLocked ? 0)}</small>
+                  <small>Solde : {moneyOrDash(wallet?.balanceAvailable ?? 0)} · Bloqué : {moneyOrDash(wallet?.balanceLocked ?? 0)}</small>
                 </div>
                 <div className="inline-actions">
                   <button
