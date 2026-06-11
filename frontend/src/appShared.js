@@ -7,6 +7,18 @@ export function money(value) {
   return `${Number(value || 0).toLocaleString('fr-FR')} CFA`;
 }
 
+export function timeAgo(value) {
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return '';
+  const diffMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+  if (diffMinutes < 1) return 'à l’instant';
+  if (diffMinutes < 60) return `${diffMinutes} min`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} h`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} j`;
+}
+
 export function moneyOrDash(value) {
   return Number.isFinite(Number(value)) ? money(value) : '0 CFA';
 }
